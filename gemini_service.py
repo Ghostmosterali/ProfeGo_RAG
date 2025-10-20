@@ -508,7 +508,7 @@ No se proporcionó diagnóstico específico del grupo.
                 }
             
             # Agregar metadata
-            plan_data['generado_con'] = 'Gemini AI - Preescolar Edition'
+            plan_data['generado_con'] = 'ProfeGoAI - Preescolar Edition'
             plan_data['modelo'] = MODEL_NAME
             plan_data['tiene_diagnostico'] = bool(diagnostico_text and diagnostico_text.strip())
             plan_data['nivel'] = 'Preescolar 2'

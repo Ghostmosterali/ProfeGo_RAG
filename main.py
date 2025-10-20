@@ -23,6 +23,9 @@ from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from rag_system import get_rag_system, initialize_rag_system
+from typing import List, Dict, Optional
+import json
+from pathlib import Path
 """
 Endpoints para visualizar métricas RAG y demostrar su funcionamiento
 """
@@ -259,13 +262,14 @@ async def login(request: Request, user_data: UserLogin):
 async def startup_event():
     """
     Inicializa el sistema RAG al arrancar la aplicación
+    VERSIÓN MEJORADA CON LOGS
     """
-    global rag_system
+    global rag_system, rag_analyzer
     
     logger.info("🚀 Inicializando sistema RAG...")
     
     try:
-        # Crear directorios manualmente antes de inicializar RAG
+        # Crear directorios manualmente
         from pathlib import Path
         
         dirs_to_create = [
@@ -279,26 +283,41 @@ async def startup_event():
         
         logger.info("✅ Directorios RAG creados/verificados")
         
+        # Verificar que hay archivos en la biblioteca
+        cuentos_count = len(list(Path('./rag_data/cuentos').glob('**/*.txt')))
+        canciones_count = len(list(Path('./rag_data/canciones').glob('**/*.txt')))
+        
+        logger.info(f"📚 Biblioteca: {cuentos_count} cuentos, {canciones_count} canciones")
+        
+        if cuentos_count == 0 and canciones_count == 0:
+            logger.warning("⚠️ Biblioteca RAG vacía - No se encontraron archivos .txt")
+            logger.warning("💡 Agrega archivos .txt en ./rag_data/cuentos y ./rag_data/canciones")
+            logger.warning("💡 Luego ejecuta: python init_rag.py")
+        
         # Inicializar sistema RAG
         rag_system = initialize_rag_system()
         
         if rag_system is None:
-            logger.warning("⚠️ Sistema RAG no pudo inicializarse, continuando sin RAG")
+            logger.warning("⚠️ Sistema RAG no pudo inicializarse")
             return
         
-        # Verificar si necesita inicialización de biblioteca general
+        # Inicializar analizador RAG
+        rag_analyzer = RAGAnalyzer(rag_system)
+        logger.info("✅ RAG Analyzer inicializado")
+        
+        # Verificar stats
         stats = rag_system.get_stats()
         
         if stats['total_documents'] == 0:
-            logger.info("📚 Biblioteca general vacía")
-            logger.info("💡 Ejecuta 'python init_rag.py' para indexar archivos")
+            logger.warning("⚠️ Vector store vacío - ejecuta 'python init_rag.py'")
         else:
-            logger.info(f"✅ Biblioteca general lista: {stats['total_documents']} documentos")
+            logger.info(f"✅ Vector store listo: {stats['total_documents']} documentos indexados")
         
     except Exception as e:
-        logger.error(f"❌ Error inicializando RAG: {e}")
+        logger.error(f"❌ Error inicializando RAG: {e}", exc_info=True)
         logger.warning("⚠️ La aplicación continuará sin RAG")
         rag_system = None
+        rag_analyzer = None
 
 @app.post("/api/auth/register")
 @limiter.limit("3/minute")
@@ -944,26 +963,17 @@ async def generate_plan_with_rag(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Genera un plan de estudio personalizado usando Gemini AI
-    
-    - **plan_file**: Archivo obligatorio con el plan de estudios oficial
-    - **diagnostico_file**: Archivo opcional con diagnóstico del grupo
-    
-    Proceso:
-    1. Extrae texto de los archivos con OCR
-    2. Envía a Gemini AI para análisis y estructuración
-    3. Guarda el plan generado en GCS
-    4. Retorna la estructura completa del plan
+    Genera un plan de estudio personalizado usando Gemini AI + RAG
+    VERSIÓN MEJORADA CON CAPTURA DE DOCUMENTOS RAG
     """
     user_email = current_user["email"]
     start_time = time.time()
     
-    logger.info(f"🎓 Generando plan para usuario: {user_email}")
+    logger.info(f"🎓 Generando plan con RAG para usuario: {user_email}")
     
     try:
         # ========== VALIDACIÓN DE ARCHIVOS ==========
         
-        # Validar archivo del plan
         if not ProfeGoUtils.validar_extension(plan_file.filename):
             raise HTTPException(
                 status_code=400,
@@ -977,7 +987,6 @@ async def generate_plan_with_rag(
                 detail="El archivo del plan excede el límite de 80MB"
             )
         
-        # Validar archivo de diagnóstico (si existe)
         diagnostico_content = None
         diagnostico_filename = None
         
@@ -996,31 +1005,28 @@ async def generate_plan_with_rag(
                 )
             diagnostico_filename = diagnostico_file.filename
         
-        logger.info(f"✅ Archivos validados - Plan: {plan_file.filename}, Diagnóstico: {diagnostico_filename or 'No proporcionado'}")
+        logger.info(f"✅ Archivos validados")
         
         # ========== PROCESAMIENTO OCR ==========
         
         logger.info("📄 Extrayendo texto del plan de estudios...")
         
-        # Guardar plan temporalmente
         with tempfile.NamedTemporaryFile(delete=False, suffix=Path(plan_file.filename).suffix) as tmp_plan:
             tmp_plan.write(plan_content)
             tmp_plan_path = tmp_plan.name
         
         try:
-            # Extraer texto del plan
             plan_result = get_text_only(tmp_plan_path)
             
             if not plan_result['success'] or not plan_result['text']:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"No se pudo extraer texto del plan: {plan_result.get('error', 'Error desconocido')}"
+                    detail=f"No se pudo extraer texto del plan"
                 )
             
             plan_text = plan_result['text']
             logger.info(f"✅ Texto extraído del plan: {len(plan_text)} caracteres")
             
-            # Extraer texto del diagnóstico si existe
             diagnostico_text = None
             
             if diagnostico_content:
@@ -1036,18 +1042,71 @@ async def generate_plan_with_rag(
                     if diagnostico_result['success'] and diagnostico_result['text']:
                         diagnostico_text = diagnostico_result['text']
                         logger.info(f"✅ Texto extraído del diagnóstico: {len(diagnostico_text)} caracteres")
-                    else:
-                        logger.warning(f"⚠️ No se pudo extraer texto del diagnóstico, continuando sin él")
-                        diagnostico_text = None
                 
                 finally:
                     if os.path.exists(tmp_diag_path):
                         os.remove(tmp_diag_path)
             
         finally:
-            # Limpiar archivo temporal del plan
             if os.path.exists(tmp_plan_path):
                 os.remove(tmp_plan_path)
+        
+        # ========== RECUPERACIÓN RAG ==========
+        
+        retrieved_docs = {'cuentos': [], 'canciones': []}
+        
+        if rag_system is not None:
+            logger.info("🔍 Recuperando documentos de la biblioteca RAG...")
+            
+            try:
+                # Combinar plan y diagnóstico para búsqueda
+                query_text = plan_text
+                if diagnostico_text:
+                    query_text = f"{plan_text}\n\n{diagnostico_text}"
+                
+                # Generar embedding
+                query_embedding = rag_system.embeddings.embed_query(query_text)
+                
+                # Buscar cuentos
+                cuentos_results = rag_system.vector_store.query(
+                    query_embedding=query_embedding,
+                    n_results=5,
+                    filter_metadata={'document_type': 'cuento'}
+                )
+                
+                for doc, metadata, distance in zip(
+                    cuentos_results['documents'],
+                    cuentos_results['metadatas'],
+                    cuentos_results['distances']
+                ):
+                    retrieved_docs['cuentos'].append({
+                        'text': doc,
+                        'metadata': metadata,
+                        'similarity': 1 - distance
+                    })
+                
+                # Buscar canciones
+                canciones_results = rag_system.vector_store.query(
+                    query_embedding=query_embedding,
+                    n_results=5,
+                    filter_metadata={'document_type': 'cancion'}
+                )
+                
+                for doc, metadata, distance in zip(
+                    canciones_results['documents'],
+                    canciones_results['metadatas'],
+                    canciones_results['distances']
+                ):
+                    retrieved_docs['canciones'].append({
+                        'text': doc,
+                        'metadata': metadata,
+                        'similarity': 1 - distance
+                    })
+                
+                logger.info(f"✅ RAG: {len(retrieved_docs['cuentos'])} cuentos, {len(retrieved_docs['canciones'])} canciones recuperados")
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Error en RAG, continuando sin él: {e}")
         
         # ========== GENERACIÓN CON GEMINI ==========
         
@@ -1061,20 +1120,17 @@ async def generate_plan_with_rag(
         if not resultado_gemini['success']:
             raise HTTPException(
                 status_code=500,
-                detail=f"Error generando plan con IA: {resultado_gemini.get('error', 'Error desconocido')}"
+                detail=f"Error generando plan con IA: {resultado_gemini.get('error')}"
             )
         
         plan_data = resultado_gemini['plan']
         
         logger.info(f"✅ Plan generado: {plan_data['nombre_plan']}")
-        logger.info(f"📊 Módulos: {plan_data.get('num_modulos', len(plan_data['modulos']))}")
         
-        # ========== GUARDAR EN GCS ==========
+        # ========== AGREGAR METADATA RAG ==========
         
-        # Generar ID único para el plan
         plan_id = f"plan_{uuid.uuid4().hex[:12]}_{int(datetime.now().timestamp())}"
         
-        # Agregar metadata al plan
         plan_data['plan_id'] = plan_id
         plan_data['usuario'] = user_email
         plan_data['fecha_generacion'] = datetime.now().isoformat()
@@ -1083,7 +1139,29 @@ async def generate_plan_with_rag(
             'diagnostico': diagnostico_filename
         }
         
-        # Guardar plan como JSON en GCS
+        # IMPORTANTE: Guardar documentos RAG recuperados
+        plan_data['rag_metadata'] = {
+            'recursos_recuperados': {
+                'cuentos': [
+                    {
+                        'nombre': c['metadata'].get('filename', ''),
+                        'similitud': c['similarity']
+                    }
+                    for c in retrieved_docs['cuentos']
+                ],
+                'canciones': [
+                    {
+                        'nombre': c['metadata'].get('filename', ''),
+                        'similitud': c['similarity']
+                    }
+                    for c in retrieved_docs['canciones']
+                ]
+            },
+            'total_recuperado': len(retrieved_docs['cuentos']) + len(retrieved_docs['canciones'])
+        }
+        
+        # ========== GUARDAR EN GCS ==========
+        
         plan_json = json.dumps(plan_data, indent=2, ensure_ascii=False)
         plan_json_bytes = plan_json.encode('utf-8')
         
@@ -1091,17 +1169,13 @@ async def generate_plan_with_rag(
             contenido=plan_json_bytes,
             email=user_email,
             nombre_archivo=f"{plan_id}.json",
-            es_procesado=True  # Guardar en carpeta "processed"
+            es_procesado=True
         )
         
-        if not resultado_guardado['success']:
-            logger.warning(f"⚠️ No se pudo guardar el plan en GCS: {resultado_guardado.get('error')}")
-        else:
-            logger.info(f"✅ Plan guardado en GCS: {resultado_guardado['path']}")
+        if resultado_guardado['success']:
+            logger.info(f"✅ Plan guardado en GCS con metadata RAG")
         
-        # ========== GUARDAR ARCHIVOS ORIGINALES ==========
-        
-        # Subir plan original
+        # Subir archivos originales
         gcs_storage.subir_archivo_desde_bytes(
             contenido=plan_content,
             email=user_email,
@@ -1109,7 +1183,6 @@ async def generate_plan_with_rag(
             es_procesado=False
         )
         
-        # Subir diagnóstico si existe
         if diagnostico_content:
             gcs_storage.subir_archivo_desde_bytes(
                 contenido=diagnostico_content,
@@ -1121,7 +1194,7 @@ async def generate_plan_with_rag(
         # ========== RETORNAR RESULTADO ==========
         
         processing_time = time.time() - start_time
-        logger.info(f"⏱️ Tiempo total de procesamiento: {processing_time:.2f} segundos")
+        logger.info(f"⏱️ Tiempo total: {processing_time:.2f}s")
         
         return PlanResponse(
             success=True,
@@ -1136,7 +1209,7 @@ async def generate_plan_with_rag(
         logger.error(f"❌ Error generando plan: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Error inesperado generando plan: {str(e)}"
+            detail=f"Error inesperado: {str(e)}"
         )
 
 
@@ -1604,6 +1677,466 @@ async def verify_rag_usage_in_plan(
     except Exception as e:
         logger.error(f"Error verificando RAG: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+class RAGAnalyzer:
+    """
+    Analizador avanzado de similitud semántica entre planes y recursos RAG
+    """
+    
+    def __init__(self, rag_system):
+        self.rag_system = rag_system
+    
+    def analyze_plan_rag_match(
+        self,
+        plan_data: Dict,
+        retrieved_docs: Dict,
+        threshold: float = 0.40  # 40% de similitud mínima
+    ) -> Dict:
+        """
+        Analiza la similitud entre el plan generado y los recursos RAG
+        
+        Args:
+            plan_data: Plan generado
+            retrieved_docs: Documentos recuperados del RAG
+            threshold: Umbral mínimo de similitud (0.40 = 40%)
+        
+        Returns:
+            Análisis detallado con recursos relevantes
+        """
+        analisis = {
+            'similitud_general': 0.0,
+            'recursos_altamente_relevantes': [],
+            'recursos_por_modulo': [],
+            'metricas_rag': {
+                'total_recursos_rag': 0,
+                'recursos_utilizados': 0,
+                'porcentaje_uso_rag': 0.0,
+                'similitud_promedio': 0.0
+            },
+            'recomendaciones_adicionales': []
+        }
+        
+        # Extraer texto completo del plan
+        plan_text = self._extract_plan_text(plan_data)
+        
+        # Generar embedding del plan completo
+        plan_embedding = self.rag_system.embeddings.embed_query(plan_text)
+        
+        # Analizar cuentos
+        cuentos = retrieved_docs.get('cuentos', [])
+        canciones = retrieved_docs.get('canciones', [])
+        
+        analisis['metricas_rag']['total_recursos_rag'] = len(cuentos) + len(canciones)
+        
+        recursos_relevantes = []
+        
+        # Analizar similitud de cuentos
+        for cuento in cuentos:
+            similitud = cuento.get('similarity', 0)
+            if similitud >= threshold:
+                recurso = self._format_recurso(cuento, 'cuento', similitud)
+                recursos_relevantes.append(recurso)
+                analisis['metricas_rag']['recursos_utilizados'] += 1
+        
+        # Analizar similitud de canciones
+        for cancion in canciones:
+            similitud = cancion.get('similarity', 0)
+            if similitud >= threshold:
+                recurso = self._format_recurso(cancion, 'cancion', similitud)
+                recursos_relevantes.append(recurso)
+                analisis['metricas_rag']['recursos_utilizados'] += 1
+        
+        # Ordenar por similitud
+        recursos_relevantes.sort(key=lambda x: x['similitud_porcentaje'], reverse=True)
+        analisis['recursos_altamente_relevantes'] = recursos_relevantes
+        
+        # Calcular métricas
+        if analisis['metricas_rag']['total_recursos_rag'] > 0:
+            analisis['metricas_rag']['porcentaje_uso_rag'] = round(
+                (analisis['metricas_rag']['recursos_utilizados'] / 
+                 analisis['metricas_rag']['total_recursos_rag']) * 100,
+                1
+            )
+        
+        if recursos_relevantes:
+            analisis['metricas_rag']['similitud_promedio'] = round(
+                sum(r['similitud_porcentaje'] for r in recursos_relevantes) / len(recursos_relevantes),
+                1
+            )
+        
+        # Analizar por módulo
+        analisis['recursos_por_modulo'] = self._analyze_modules(
+            plan_data,
+            retrieved_docs,
+            threshold
+        )
+        
+        return analisis
+    
+    def _extract_plan_text(self, plan_data: Dict) -> str:
+        """Extrae el texto completo del plan para análisis"""
+        texts = []
+        
+        texts.append(plan_data.get('nombre_plan', ''))
+        texts.append(plan_data.get('campo_formativo_principal', ''))
+        
+        for modulo in plan_data.get('modulos', []):
+            texts.append(modulo.get('nombre', ''))
+            texts.append(modulo.get('aprendizaje_esperado', ''))
+            
+            # Actividades
+            if modulo.get('actividad_inicio'):
+                texts.append(modulo['actividad_inicio'].get('descripcion', ''))
+            
+            for act in modulo.get('actividades_desarrollo', []):
+                texts.append(act.get('descripcion', ''))
+        
+        return ' '.join(filter(None, texts))
+    
+    def _format_recurso(self, doc: Dict, tipo: str, similitud: float) -> Dict:
+        """Formatea un recurso RAG para presentación"""
+        metadata = doc.get('metadata', {})
+        texto = doc.get('text', '')
+        
+        # Extraer título del nombre del archivo
+        filename = metadata.get('filename', 'Recurso desconocido')
+        titulo = Path(filename).stem.replace('_', ' ').title()
+        
+        # Determinar si es recurso real o creativo
+        es_real = 'RECURSO REAL' if filename in self._get_real_resources() else 'PROPUESTA CREATIVA'
+        
+        return {
+            'titulo': titulo,
+            'tipo': tipo,
+            'fuente': es_real,
+            'similitud_porcentaje': round(similitud * 100, 1),
+            'similitud_nivel': self._get_similarity_level(similitud),
+            'contenido_completo': texto,
+            'fragmento': texto[:300] + '...' if len(texto) > 300 else texto,
+            'filename': filename,
+            'acceso': 'GRATUITO' if es_real == 'RECURSO REAL' else 'N/A'
+        }
+    
+    def _get_similarity_level(self, similitud: float) -> str:
+        """Clasifica el nivel de similitud"""
+        if similitud >= 0.65:
+            return 'MUY ALTA'
+        elif similitud >= 0.55:
+            return 'ALTA'
+        elif similitud >= 0.45:
+            return 'MEDIA-ALTA'
+        elif similitud >= 0.30:
+            return 'MEDIA'
+        else:
+            return 'BAJA'
+    
+    def _get_real_resources(self) -> set:
+        """Lista de recursos reales conocidos"""
+        return {
+            "./rag_data/canciones/Campana sobre campana.txt",
+            "./rag_data/canciones/La vaca lola.txt",
+            "./rag_data/canciones/LOS OFICIOS CANCIÓN INFANTIL  AglaE.txt",
+            "./rag_data/canciones/Gato Carpintero.txt",
+            "./rag_data/canciones/El periquito azul.txt"
+        }
+    
+    def _analyze_modules(
+        self,
+        plan_data: Dict,
+        retrieved_docs: Dict,
+        threshold: float
+    ) -> List[Dict]:
+        """Analiza similitud por módulo"""
+        modulos_analisis = []
+        
+        for modulo in plan_data.get('modulos', []):
+            modulo_text = f"{modulo.get('nombre', '')} {modulo.get('aprendizaje_esperado', '')}"
+            
+            if not modulo_text.strip():
+                continue
+            
+            # Generar embedding del módulo
+            modulo_embedding = self.rag_system.embeddings.embed_query(modulo_text)
+            
+            # Buscar recursos relacionados
+            recursos_modulo = []
+            
+            for cuento in retrieved_docs.get('cuentos', []):
+                if cuento.get('similarity', 0) >= threshold:
+                    recursos_modulo.append({
+                        'titulo': Path(cuento['metadata']['filename']).stem.replace('_', ' '),
+                        'tipo': 'cuento',
+                        'similitud': round(cuento['similarity'] * 100, 1)
+                    })
+            
+            for cancion in retrieved_docs.get('canciones', []):
+                if cancion.get('similarity', 0) >= threshold:
+                    recursos_modulo.append({
+                        'titulo': Path(cancion['metadata']['filename']).stem.replace('_', ' '),
+                        'tipo': 'cancion',
+                        'similitud': round(cancion['similarity'] * 100, 1)
+                    })
+            
+            if recursos_modulo:
+                modulos_analisis.append({
+                    'numero': modulo.get('numero', 0),
+                    'nombre': modulo.get('nombre', ''),
+                    'recursos_relacionados': recursos_modulo[:3]  # Top 3
+                })
+        
+        return modulos_analisis
+
+
+# Instancia global del analizador
+rag_analyzer = None
+
+
+@app.on_event("startup")
+async def initialize_rag_analyzer():
+    """Inicializa el analizador RAG al arranque"""
+    global rag_analyzer
+    
+    if rag_system is not None:
+        rag_analyzer = RAGAnalyzer(rag_system)
+        logger.info("✅ RAG Analyzer inicializado")
+
+
+@app.get("/api/plans/{plan_id}/rag-analysis")
+async def analyze_plan_rag(
+    plan_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Endpoint MEJORADO: Análisis completo de similitud RAG
+    Con mejor manejo de errores y datos faltantes
+    """
+    user_email = current_user["email"]
+    
+    try:
+        logger.info(f"🔍 Iniciando análisis RAG para plan: {plan_id}")
+        
+        # Verificar que el analizador RAG existe
+        if rag_analyzer is None or rag_system is None:
+            logger.warning("Sistema RAG no disponible")
+            return {
+                'success': False,
+                'message': 'El sistema de análisis RAG no está disponible en este momento. Asegúrate de que la biblioteca RAG esté inicializada.'
+            }
+        
+        # Obtener el plan
+        filename = f"{plan_id}.json"
+        contenido = gcs_storage.obtener_archivo_bytes(
+            email=user_email,
+            nombre_archivo=filename,
+            es_procesado=True
+        )
+        
+        if not contenido:
+            logger.warning(f"Plan no encontrado: {plan_id}")
+            raise HTTPException(status_code=404, detail="Plan no encontrado")
+        
+        plan_data = json.loads(contenido.decode('utf-8'))
+        logger.info(f"✅ Plan cargado: {plan_data.get('nombre_plan')}")
+        
+        # Verificar metadata RAG
+        rag_metadata = plan_data.get('rag_metadata', {})
+        
+        if not rag_metadata or not rag_metadata.get('recursos_recuperados'):
+            logger.warning(f"Plan sin metadata RAG: {plan_id}")
+            return {
+                'success': False,
+                'message': 'Este plan no tiene metadata RAG. Fue generado antes de implementar el sistema RAG o sin recursos en la biblioteca.',
+                'plan_name': plan_data.get('nombre_plan'),
+                'sugerencia': 'Genera un nuevo plan para que incluya análisis RAG automáticamente.'
+            }
+        
+        # Reconstruir retrieved_docs desde metadata
+        retrieved_docs = {
+            'cuentos': [],
+            'canciones': []
+        }
+        
+        logger.info("📚 Reconstruyendo documentos RAG desde metadata...")
+        
+        recursos_metadata = rag_metadata.get('recursos_recuperados', {})
+        
+        # Buscar cuentos en el filesystem
+        cuentos_dir = Path('./rag_data/cuentos')
+        for cuento_meta in recursos_metadata.get('cuentos', []):
+            filename_cuento = cuento_meta.get('nombre', '')
+            if not filename_cuento:
+                continue
+                
+            cuento_path = cuentos_dir / filename_cuento
+            
+            if cuento_path.exists():
+                try:
+                    with open(cuento_path, 'r', encoding='utf-8') as f:
+                        contenido_cuento = f.read()
+                    
+                    retrieved_docs['cuentos'].append({
+                        'text': contenido_cuento,
+                        'metadata': {
+                            'filename': filename_cuento,
+                            'document_type': 'cuento'
+                        },
+                        'similarity': cuento_meta.get('similitud', 0.75)
+                    })
+                    logger.info(f"✅ Cuento cargado: {filename_cuento}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Error leyendo cuento {filename_cuento}: {e}")
+            else:
+                logger.warning(f"⚠️ Cuento no encontrado: {cuento_path}")
+        
+        # Buscar canciones en el filesystem
+        canciones_dir = Path('./rag_data/canciones')
+        for cancion_meta in recursos_metadata.get('canciones', []):
+            filename_cancion = cancion_meta.get('nombre', '')
+            if not filename_cancion:
+                continue
+                
+            cancion_path = canciones_dir / filename_cancion
+            
+            if cancion_path.exists():
+                try:
+                    with open(cancion_path, 'r', encoding='utf-8') as f:
+                        contenido_cancion = f.read()
+                    
+                    retrieved_docs['canciones'].append({
+                        'text': contenido_cancion,
+                        'metadata': {
+                            'filename': filename_cancion,
+                            'document_type': 'cancion'
+                        },
+                        'similarity': cancion_meta.get('similitud', 0.75)
+                    })
+                    logger.info(f"✅ Canción cargada: {filename_cancion}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Error leyendo canción {filename_cancion}: {e}")
+            else:
+                logger.warning(f"⚠️ Canción no encontrada: {cancion_path}")
+        
+        total_recursos = len(retrieved_docs['cuentos']) + len(retrieved_docs['canciones'])
+        logger.info(f"📊 Total recursos cargados: {total_recursos}")
+        
+        if total_recursos == 0:
+            return {
+                'success': False,
+                'message': 'No se pudieron cargar los recursos RAG desde el filesystem. Es posible que los archivos hayan sido eliminados.',
+                'plan_name': plan_data.get('nombre_plan')
+            }
+        
+        # Realizar análisis
+        logger.info("🔬 Analizando similitud semántica...")
+        analisis = rag_analyzer.analyze_plan_rag_match(
+            plan_data,
+            retrieved_docs,
+            threshold=0.65
+        )
+        
+        logger.info(f"✅ Análisis completado: {analisis['metricas_rag']['porcentaje_uso_rag']}% uso RAG")
+        
+        # Generar recursos formateados
+        recursos_completos = []
+        for recurso in analisis['recursos_altamente_relevantes']:
+            recursos_completos.append({
+                **recurso,
+                'markdown_formato': f"""---
+### 📚 Recurso Musical o Literario Relacionado
+
+**Título:** {recurso['titulo']}  
+**Tipo:** {recurso['tipo'].upper()}  
+**Fuente:** {recurso['fuente']}  
+**Similitud con el plan:** {recurso['similitud_porcentaje']}% ({recurso['similitud_nivel']})  
+**Acceso:** {recurso['acceso']}
+
+**Contenido completo:**
+
+{recurso['contenido_completo']}
+
+---
+"""
+            })
+        
+        return {
+            'success': True,
+            'plan_id': plan_id,
+            'plan_name': plan_data.get('nombre_plan'),
+            'analisis': analisis,
+            'recursos_completos': recursos_completos
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error analizando RAG: {e}", exc_info=True)
+        return {
+            'success': False,
+            'message': f'Error inesperado al analizar RAG: {str(e)}',
+            'error_type': type(e).__name__
+        }
+
+
+@app.get("/api/plans/{plan_id}/rag-metrics")
+async def get_plan_rag_metrics(
+    plan_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Endpoint simplificado: Solo métricas RAG de un plan
+    """
+    user_email = current_user["email"]
+    
+    try:
+        analysis_response = await analyze_plan_rag(plan_id, current_user)
+        
+        if not analysis_response['success']:
+            return analysis_response
+        
+        analisis = analysis_response['analisis']
+        
+        return {
+            'success': True,
+            'plan_id': plan_id,
+            'plan_name': analysis_response['plan_name'],
+            'metricas': analisis['metricas_rag'],
+            'recursos_count': len(analisis['recursos_altamente_relevantes']),
+            'similitud_general': analisis['metricas_rag']['similitud_promedio']
+        }
+        
+    except Exception as e:
+        logger.error(f"Error obteniendo métricas: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@app.get("/api/rag/debug/status")
+async def rag_debug_status():
+    """
+    Endpoint de debug para verificar estado del sistema RAG
+    """
+    cuentos_path = Path('./rag_data/cuentos')
+    canciones_path = Path('./rag_data/canciones')
+    
+    cuentos_files = list(cuentos_path.glob('**/*.txt')) if cuentos_path.exists() else []
+    canciones_files = list(canciones_path.glob('**/*.txt')) if canciones_path.exists() else []
+    
+    status = {
+        'rag_system_initialized': rag_system is not None,
+        'rag_analyzer_initialized': rag_analyzer is not None,
+        'filesystem': {
+            'cuentos_dir_exists': cuentos_path.exists(),
+            'canciones_dir_exists': canciones_path.exists(),
+            'cuentos_files': [f.name for f in cuentos_files],
+            'canciones_files': [f.name for f in canciones_files],
+            'total_files': len(cuentos_files) + len(canciones_files)
+        }
+    }
+    
+    if rag_system:
+        stats = rag_system.get_stats()
+        status['vector_store'] = stats
+    
+    return status
 
 # ============================================================================
 # RUTAS PARA SERVIR EL FRONTEND

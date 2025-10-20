@@ -333,14 +333,14 @@ async function processPlan() {
         }
         
         // Validar tamaños
-        const maxSize = 80 * 1024 * 1024; // 80MB
+        const maxSize = 10 * 1024 * 1024; // 10MB
         if (planFile.size > maxSize) {
-            showMessage('El plan de estudios excede el tamaño máximo de 80MB', 'error');
+            showMessage('El plan de estudios excede el tamaño máximo de 10MB', 'error');
             return;
         }
         
         if (diagnosticoFile && diagnosticoFile.size > maxSize) {
-            showMessage('El diagnóstico excede el tamaño máximo de 80MB', 'error');
+            showMessage('El diagnóstico excede el tamaño máximo de 10MB', 'error');
             return;
         }
         
@@ -481,7 +481,6 @@ function createPlanCard(plan) {
     const diagnosticoIcon = plan.tiene_diagnostico ? '✅' : '⚪';
     const diagnosticoText = plan.tiene_diagnostico ? 'Con diagnóstico' : 'Sin diagnóstico';
     
-    // Adaptar para mostrar campo_formativo o materia
     const campoFormativo = plan.campo_formativo_principal || plan.campo_formativo || plan.materia || '';
     
     return `
@@ -503,8 +502,11 @@ function createPlanCard(plan) {
                 <button class="btn-action btn-view" onclick="showPlanDetail('${plan.plan_id}')" title="Ver detalle">
                     👁️ Ver
                 </button>
-                <button class="btn-action btn-download" onclick="downloadPlan('${plan.plan_id}')" title="Descargar JSON">
-                    📥 Descargar
+                <button class="btn-action btn-rag-analysis" onclick="showRAGAnalysis('${plan.plan_id}')" title="Análisis RAG">
+                    🔍 RAG
+                </button>
+                <button class="btn-action btn-download" onclick="downloadPlan('${plan.plan_id}')" title="Descargar Word">
+                    📥 Word
                 </button>
                 <button class="btn-action btn-delete" onclick="confirmDeletePlan('${plan.plan_id}')" title="Eliminar">
                     🗑️ Eliminar
@@ -1192,6 +1194,367 @@ function setupEventListeners() {
         }
     });
 }
+// ============================================================================
+// FUNCIONES DE ANÁLISIS RAG
+// ============================================================================
+
+// ============================================================================
+// FUNCIONES DE ANÁLISIS RAG - VERSIÓN CON MEJOR MANEJO DE ERRORES
+// ============================================================================
+
+async function showRAGAnalysis(planId) {
+    const modal = document.getElementById('rag-analysis-modal');
+    const content = document.getElementById('rag-analysis-content');
+    
+    try {
+        showLoading('Analizando similitud semántica con RAG...');
+        
+        const response = await apiRequest(`/plans/${planId}/rag-analysis`);
+        
+        hideLoading();
+        
+        console.log('📊 Respuesta RAG:', response); // Debug
+        
+        if (!response.success) {
+            // Mostrar mensaje específico en el modal
+            content.innerHTML = `
+                <div class="rag-error-container">
+                    <div class="error-icon">⚠️</div>
+                    <h3>Análisis RAG no disponible</h3>
+                    <p>${response.message || 'No se pudo realizar el análisis RAG para este plan.'}</p>
+                    <div class="error-details">
+                        <h4>Posibles causas:</h4>
+                        <ul>
+                            <li>Este plan fue generado sin el sistema RAG activo</li>
+                            <li>No hay recursos en la biblioteca RAG (cuentos/canciones)</li>
+                            <li>El plan no contiene metadata RAG</li>
+                        </ul>
+                        <h4>Solución:</h4>
+                        <p>Genera un nuevo plan para que incluya análisis RAG automáticamente.</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="document.getElementById('rag-analysis-modal').classList.remove('active')">
+                        Cerrar
+                    </button>
+                </div>
+            `;
+            modal.classList.add('active');
+            return;
+        }
+        
+        // Verificar que tenemos los datos necesarios
+        if (!response.analisis || !response.analisis.metricas_rag) {
+            content.innerHTML = `
+                <div class="rag-error-container">
+                    <div class="error-icon">❌</div>
+                    <h3>Error en los datos RAG</h3>
+                    <p>La respuesta del servidor no contiene los datos esperados.</p>
+                    <button class="btn btn-primary" onclick="document.getElementById('rag-analysis-modal').classList.remove('active')">
+                        Cerrar
+                    </button>
+                </div>
+            `;
+            modal.classList.add('active');
+            return;
+        }
+        
+        // Mostrar análisis
+        displayRAGAnalysis(response);
+        
+    } catch (error) {
+        hideLoading();
+        console.error('❌ Error completo:', error);
+        
+        // Mostrar error detallado en el modal
+        content.innerHTML = `
+            <div class="rag-error-container">
+                <div class="error-icon">🔴</div>
+                <h3>Error al analizar RAG</h3>
+                <p>Ocurrió un error al intentar analizar el plan con RAG:</p>
+                <div class="error-message">
+                    <code>${error.message || 'Error desconocido'}</code>
+                </div>
+                <div class="error-details">
+                    <h4>Información técnica:</h4>
+                    <pre>${JSON.stringify(error, null, 2)}</pre>
+                </div>
+                <button class="btn btn-primary" onclick="document.getElementById('rag-analysis-modal').classList.remove('active')">
+                    Cerrar
+                </button>
+            </div>
+        `;
+        modal.classList.add('active');
+    }
+}
+
+function displayRAGAnalysis(data) {
+    const modal = document.getElementById('rag-analysis-modal');
+    const content = document.getElementById('rag-analysis-content');
+    
+    const analisis = data.analisis;
+    const metricas = analisis.metricas_rag;
+    
+    let html = `
+        <div class="rag-analysis-summary">
+            <h3>📈 Resumen General</h3>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon">📚</div>
+                    <div class="metric-info">
+                        <div class="metric-value">${metricas.total_recursos_rag}</div>
+                        <div class="metric-label">Recursos RAG Recuperados</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">✅</div>
+                    <div class="metric-info">
+                        <div class="metric-value">${metricas.recursos_utilizados}</div>
+                        <div class="metric-label">Recursos Utilizados</div>
+                    </div>
+                </div>
+                <div class="metric-card highlight">
+                    <div class="metric-icon">📊</div>
+                    <div class="metric-info">
+                        <div class="metric-value">${metricas.porcentaje_uso_rag}%</div>
+                        <div class="metric-label">Uso de RAG en el Plan</div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">🎯</div>
+                    <div class="metric-info">
+                        <div class="metric-value">${metricas.similitud_promedio}%</div>
+                        <div class="metric-label">Similitud Promedio</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="rag-analysis-chart">
+            <h3>📊 Distribución de Uso de RAG</h3>
+            <div class="chart-container">
+                <div class="donut-chart">
+                    <svg viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#e0e0e0" stroke-width="20"/>
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#4CAF50" stroke-width="20"
+                            stroke-dasharray="${metricas.porcentaje_uso_rag * 2.51} 251.2"
+                            transform="rotate(-90 50 50)"/>
+                        <text x="50" y="50" text-anchor="middle" dy=".3em" font-size="20" font-weight="bold" fill="#4CAF50">
+                            ${metricas.porcentaje_uso_rag}%
+                        </text>
+                    </svg>
+                </div>
+                <div class="chart-legend">
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #4CAF50;"></span>
+                        <span>Recursos de RAG</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background: #e0e0e0;"></span>
+                        <span>Otros recursos</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Recursos altamente relevantes
+    if (analisis.recursos_altamente_relevantes.length > 0) {
+        html += `
+            <div class="rag-recursos-section">
+                <h3>🎯 Recursos Altamente Relevantes (Similitud ≥ 65%)</h3>
+                <p class="section-description">
+                    Estos recursos de la biblioteca tienen una alta similitud semántica con tu plan.
+                    Se pueden integrar directamente en las actividades.
+                </p>
+        `;
+        
+        data.recursos_completos.forEach(recurso => {
+            const nivelClass = recurso.similitud_nivel.toLowerCase().replace('-', '_');
+            const icon = recurso.tipo === 'cuento' ? '📖' : '🎵';
+            
+            html += `
+                <div class="recurso-relevante-card">
+                    <div class="recurso-relevante-header">
+                        <div class="recurso-title">
+                            <span class="recurso-icon-big">${icon}</span>
+                            <div>
+                                <h4>${escapeHtml(recurso.titulo)}</h4>
+                                <div class="recurso-badges">
+                                    <span class="badge badge-${recurso.tipo}">${recurso.tipo.toUpperCase()}</span>
+                                    <span class="badge badge-fuente">${recurso.fuente}</span>
+                                    <span class="badge badge-acceso">${recurso.acceso}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="similitud-score ${nivelClass}">
+                            <div class="score-value">${recurso.similitud_porcentaje}%</div>
+                            <div class="score-label">${recurso.similitud_nivel}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="recurso-similitud-bar">
+                        <div class="similitud-fill" style="width: ${recurso.similitud_porcentaje}%;"></div>
+                    </div>
+                    
+                    <div class="recurso-content-preview">
+                        <h5>📝 Fragmento del contenido:</h5>
+                        <div class="content-preview-text">${escapeHtml(recurso.fragmento)}</div>
+                        <button class="btn-expand" onclick="toggleFullContent(this, '${escapeHtml(recurso.contenido_completo)}')">
+                            Ver contenido completo ▼
+                        </button>
+                        <div class="content-full hidden"></div>
+                    </div>
+                    
+                    <div class="recurso-markdown-section">
+                        <h5>📋 Formato Markdown para Integración:</h5>
+                        <div class="markdown-preview">
+                            <pre>${escapeHtml(recurso.markdown_formato)}</pre>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${escapeHtml(recurso.markdown_formato).replace(/'/g, "\\'")}')">
+                            📋 Copiar Markdown
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+    }
+    
+    // Análisis por módulo
+    if (analisis.recursos_por_modulo.length > 0) {
+        html += `
+            <div class="rag-modulos-section">
+                <h3>🎯 Recursos por Módulo</h3>
+                <p class="section-description">
+                    Distribución de recursos RAG relacionados con cada módulo del plan.
+                </p>
+        `;
+        
+        analisis.recursos_por_modulo.forEach(modulo => {
+            html += `
+                <div class="modulo-rag-card">
+                    <div class="modulo-rag-header">
+                        <span class="modulo-number">Módulo ${modulo.numero}</span>
+                        <h4>${escapeHtml(modulo.nombre)}</h4>
+                    </div>
+                    <div class="modulo-recursos-list">
+            `;
+            
+            modulo.recursos_relacionados.forEach(recurso => {
+                const icon = recurso.tipo === 'cuento' ? '📖' : '🎵';
+                html += `
+                    <div class="modulo-recurso-item">
+                        <span class="recurso-icon-small">${icon}</span>
+                        <span class="recurso-name">${escapeHtml(recurso.titulo)}</span>
+                        <span class="recurso-similitud-small">${recurso.similitud}%</span>
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += '</div>';
+    }
+    
+    // Interpretación de resultados
+    html += `
+        <div class="rag-interpretation">
+            <h3>💡 Interpretación de Resultados</h3>
+            <div class="interpretation-content">
+    `;
+    
+    if (metricas.porcentaje_uso_rag >= 70) {
+        html += `
+            <div class="alert alert-success">
+                <strong>✅ Excelente uso de RAG</strong>
+                <p>El ${metricas.porcentaje_uso_rag}% del plan utiliza recursos verificados de la biblioteca digital. 
+                Esto garantiza que las actividades están basadas en materiales reales y disponibles.</p>
+            </div>
+        `;
+    } else if (metricas.porcentaje_uso_rag >= 40) {
+        html += `
+            <div class="alert alert-info">
+                <strong>ℹ️ Buen uso de RAG</strong>
+                <p>El ${metricas.porcentaje_uso_rag}% del plan integra recursos de la biblioteca. 
+                Se complementa con recursos adicionales sugeridos por la IA.</p>
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="alert alert-warning">
+                <strong>⚠️ Uso limitado de RAG</strong>
+                <p>Solo el ${metricas.porcentaje_uso_rag}% del plan usa recursos de la biblioteca. 
+                Considera agregar más cuentos y canciones a la biblioteca para mejorar futuras generaciones.</p>
+            </div>
+        `;
+    }
+    
+    if (metricas.similitud_promedio >= 75) {
+        html += `
+            <div class="alert alert-success">
+                <strong>🎯 Alta relevancia semántica</strong>
+                <p>Los recursos de la biblioteca tienen una similitud promedio del ${metricas.similitud_promedio}% con el plan, 
+                lo que indica una excelente coincidencia temática.</p>
+            </div>
+        `;
+    }
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    content.innerHTML = html;
+    modal.classList.add('active');
+}
+
+function toggleFullContent(button, fullContent) {
+    const contentDiv = button.nextElementSibling;
+    
+    if (contentDiv.classList.contains('hidden')) {
+        contentDiv.innerHTML = `<pre class="content-full-text">${escapeHtml(fullContent)}</pre>`;
+        contentDiv.classList.remove('hidden');
+        button.textContent = 'Ocultar contenido completo ▲';
+    } else {
+        contentDiv.classList.add('hidden');
+        contentDiv.innerHTML = '';
+        button.textContent = 'Ver contenido completo ▼';
+    }
+}
+
+function copyToClipboard(text) {
+    // Decodificar HTML entities
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    const decodedText = textarea.value;
+    
+    navigator.clipboard.writeText(decodedText).then(() => {
+        showMessage('✅ Markdown copiado al portapapeles', 'success');
+    }).catch(err => {
+        showMessage('❌ Error copiando al portapapeles', 'error');
+    });
+}
+
+// Event listener para cerrar modal de análisis RAG
+document.getElementById('close-rag-analysis-modal')?.addEventListener('click', () => {
+    document.getElementById('rag-analysis-modal').classList.remove('active');
+});
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('rag-analysis-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'rag-analysis-modal') {
+        document.getElementById('rag-analysis-modal').classList.remove('active');
+    }
+});
+
+// Hacer función global
+window.showRAGAnalysis = showRAGAnalysis;
+window.toggleFullContent = toggleFullContent;
+window.copyToClipboard = copyToClipboard;
 
 // Hacer funciones globales para usar en onclick
 window.confirmDeleteFile = confirmDeleteFile;
