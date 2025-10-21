@@ -1769,7 +1769,7 @@ class RAGAnalyzer:
         self,
         plan_data: Dict,
         retrieved_docs: Dict,
-        threshold: float = 0.48  # 48% de similitud mínima
+        threshold: float = 0.50  # 50% de similitud mínima
     ) -> Dict:
         """
         Analiza la similitud entre el plan generado y los recursos RAG
@@ -1828,7 +1828,7 @@ class RAGAnalyzer:
                     usado = True
                     break
             
-            if usado or similitud >= 0.60:  # Baja el threshold
+            if usado or similitud >= 0.50:  # Baja el threshold
                 recurso_info = self._format_recurso(cuento, 'cuento', similitud)
                 recursos_encontrados.append(recurso_info)
                 if usado:
@@ -1856,7 +1856,7 @@ class RAGAnalyzer:
                     usado = True
                     break
             
-            if usado or similitud >= 0.60:
+            if usado or similitud >= 0.50:
                 recurso_info = self._format_recurso(cancion, 'cancion', similitud)
                 recursos_encontrados.append(recurso_info)
                 if usado:
@@ -2204,7 +2204,7 @@ async def analyze_plan_rag(
         analisis = rag_analyzer.analyze_plan_rag_match(
             plan_data,
             retrieved_docs,
-            threshold=0.65
+            threshold=0.50
         )
         
         logger.info(f"✅ Análisis completado: {analisis['metricas_rag']['porcentaje_uso_rag']}% uso RAG")

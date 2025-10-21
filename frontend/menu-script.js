@@ -1406,13 +1406,14 @@ function displayRAGAnalysis(data) {
     
     // Recursos altamente relevantes
     if (analisis.recursos_altamente_relevantes && analisis.recursos_altamente_relevantes.length > 0) {
-        html += `
-            <div class="rag-recursos-section">
-                <h3>🎯 Recursos Altamente Relevantes (Similitud ≥ 65%)</h3>
-                <p class="section-description">
-                    Estos recursos de la biblioteca tienen una alta similitud semántica con tu plan.
-                    Se pueden integrar directamente en las actividades.
-                </p>
+    html += `
+        <div class="rag-recursos-section">
+            <h3>🎯 Recursos Relevantes (Similitud ≥ 48%)</h3>
+            // ↑ NUEVO TEXTO
+            <p class="section-description">
+                Estos recursos de la biblioteca tienen al menos 50% de similitud semántica con tu plan.
+                Son suficientemente relevantes para integrarlos en las actividades.
+            </p>
         `;
         
         // Verificar que existe data.recursos_completos
