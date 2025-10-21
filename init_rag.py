@@ -1,6 +1,7 @@
 """
 Script de inicialización del sistema RAG
 Ejecutar una vez para configurar la biblioteca general
+VERSIÓN CON SOPORTE PARA ACTIVIDADES
 """
 
 import sys
@@ -28,6 +29,7 @@ def create_directories():
     directories = [
         './rag_data/cuentos',
         './rag_data/canciones',
+        './rag_data/actividades',
         './rag_data/vector_db'
     ]
     
@@ -62,19 +64,23 @@ def main():
     # Verificar si hay archivos en las carpetas
     cuentos_path = Path('./rag_data/cuentos')
     canciones_path = Path('./rag_data/canciones')
+    actividades_path = Path('./rag_data/actividades')
     
-    cuentos_count = len(list(cuentos_path.glob('**/*.*')))
-    canciones_count = len(list(canciones_path.glob('**/*.*')))
+    cuentos_files = list(cuentos_path.glob('**/*.txt')) if cuentos_path.exists() else []
+    canciones_files = list(canciones_path.glob('**/*.txt')) if canciones_path.exists() else []
+    actividades_files = list(actividades_path.glob('**/*.txt')) if actividades_path.exists() else []
     
     print(f"\nESTADISTICAS ACTUALES:")
-    print(f"   Cuentos encontrados: {cuentos_count}")
-    print(f"   Canciones encontradas: {canciones_count}")
+    print(f"   Cuentos encontrados: {len(cuentos_files)}")
+    print(f"   Canciones encontradas: {len(canciones_files)}")
+    print(f"   Actividades encontradas: {len(actividades_files)}")
     
-    if cuentos_count == 0 and canciones_count == 0:
+    if len(cuentos_files) == 0 and len(canciones_files) == 0 and len(actividades_files) == 0:
         print("\nNo se encontraron archivos en la biblioteca general")
-        print("Agrega archivos .pdf, .docx o .txt en:")
+        print("Agrega archivos .txt en:")
         print(f"   - {cuentos_path.absolute()}")
         print(f"   - {canciones_path.absolute()}")
+        print(f"   - {actividades_path.absolute()}")
         print("\nDespues ejecuta este script nuevamente para indexarlos")
         return
     

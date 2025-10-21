@@ -1,7 +1,7 @@
 """
 Generador de planes de estudio usando RAG + Gemini AI
 Combina documentos recuperados con el prompt de Gemini
-CON SISTEMA DE MÉTRICAS PARA DEMOSTRAR EL USO DE RAG
+CON SOPORTE PARA ACTIVIDADES DIDÁCTICAS
 """
 
 import logging
@@ -60,6 +60,7 @@ class RAGPlanGenerator:
             result['plan']['rag_metadata'] = {
                 'cuentos_usados': len(retrieved_documents.get('cuentos', [])),
                 'canciones_usadas': len(retrieved_documents.get('canciones', [])),
+                'actividades_usadas': len(retrieved_documents.get('actividades', [])),
                 'fuentes_rag': self._extract_sources(retrieved_documents)
             }
             
@@ -99,6 +100,17 @@ class RAGPlanGenerator:
                 context_parts.append(f"Relevancia: {doc['similarity']:.2%}")
                 context_parts.append(f"Contenido: {text_preview}")
         
+        # Agregar actividades
+        if retrieved_documents.get('actividades'):
+            context_parts.append("\n\n## 🎯 ACTIVIDADES DIDÁCTICAS DISPONIBLES:")
+            for idx, doc in enumerate(retrieved_documents['actividades'][:5], 1):
+                filename = doc['metadata'].get('filename', 'Actividad desconocida')
+                # Para actividades mostramos más contenido porque tienen estructura
+                text_preview = doc['text'][:800] + "..." if len(doc['text']) > 800 else doc['text']
+                context_parts.append(f"\n**Actividad {idx}: {filename}**")
+                context_parts.append(f"Relevancia: {doc['similarity']:.2%}")
+                context_parts.append(f"Contenido completo:\n{text_preview}")
+        
         return "\n".join(context_parts)
     
     def _enrich_plan_with_rag(self, plan_text: str, rag_context: str) -> str:
@@ -123,16 +135,24 @@ class RAGPlanGenerator:
 
 ---
 
-INSTRUCCIÓN ESPECIAL: Utiliza los cuentos y canciones anteriores como INSPIRACIÓN y REFERENCIA para:
+INSTRUCCIÓN ESPECIAL: Utiliza los cuentos, canciones y actividades anteriores como INSPIRACIÓN y REFERENCIA para:
 1. Recomendar recursos reales que están disponibles en la biblioteca
 2. Crear actividades basadas en estos materiales
 3. Sugerir variaciones usando estos recursos
+4. Integrar las actividades didácticas de la biblioteca en los módulos cuando sean relevantes
 
-IMPORTANTE: 
-- Al recomendar cuentos/canciones, PRIORIZA los que aparecen arriba
+IMPORTANTE SOBRE ACTIVIDADES: 
+- Si una actividad de la biblioteca es perfecta para un módulo → inclúyela completa o adaptada
+- Marca claramente cuando una actividad proviene de la biblioteca con "basada_en_actividad_biblioteca": "SI"
+- Especifica el nombre del archivo fuente en "fuente_actividad"
+- Las actividades de la biblioteca tienen estructura completa: título, ámbito, organización, materiales, desarrollo, sugerencias
+
+IMPORTANTE SOBRE TODOS LOS RECURSOS:
+- Al recomendar cuentos/canciones/actividades, PRIORIZA los que aparecen arriba
 - Menciona específicamente los títulos de los recursos disponibles
 - Si un recurso es muy relevante, intégralo directamente en las actividades
 - Usa los recursos de la biblioteca como base para las recomendaciones de "recursos_educativos"
+- Para actividades, inclúyelas en "actividades_complementarias" con todos sus detalles
 """
         
         return enriched
@@ -149,13 +169,13 @@ IMPORTANTE:
         """
         sources = []
         
-        for doc_type in ['cuentos', 'canciones']:
+        for doc_type in ['cuentos', 'canciones', 'actividades']:
             if retrieved_documents.get(doc_type):
                 for doc in retrieved_documents[doc_type]:
                     filename = doc['metadata'].get('filename', '')
                     if filename:
                         sources.append({
-                            'tipo': doc_type[:-1],  # Remover 's' final
+                            'tipo': doc_type[:-1] if doc_type.endswith('s') else doc_type,
                             'nombre': filename,
                             'similitud': round(doc['similarity'], 3)
                         })

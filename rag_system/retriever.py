@@ -1,6 +1,7 @@
 """
 Sistema de recuperación para RAG
 Combina búsqueda vectorial con filtros inteligentes
+VERSIÓN CON SOPORTE PARA ACTIVIDADES
 """
 
 import logging
@@ -38,7 +39,7 @@ class RAGRetriever:
         plan_text: str,
         diagnostico_text: Optional[str],
         user_email: str,
-        n_results: int = 10
+        n_results: int = 15
     ) -> Dict:
         """
         Recupera documentos relevantes para generar un plan de estudios
@@ -47,7 +48,7 @@ class RAGRetriever:
             plan_text: Texto del plan de estudios
             diagnostico_text: Texto del diagnóstico (opcional)
             user_email: Email del usuario
-            n_results: Número de documentos a recuperar
+            n_results: Número total de documentos a recuperar
             
         Returns:
             Diccionario con documentos recuperados por categoría
@@ -62,10 +63,14 @@ class RAGRetriever:
         # Generar embedding de la query
         query_embedding = self.embeddings.embed_query(query_text)
         
-        # Recuperar documentos generales (cuentos y canciones)
+        # Distribuir n_results entre los 3 tipos de recursos
+        n_per_type = n_results // 3
+        
+        # Recuperar documentos generales (cuentos, canciones y actividades)
         results = {
-            'cuentos': self._retrieve_by_type(query_embedding, 'cuento', n_results // 2),
-            'canciones': self._retrieve_by_type(query_embedding, 'cancion', n_results // 2),
+            'cuentos': self._retrieve_by_type(query_embedding, 'cuento', n_per_type),
+            'canciones': self._retrieve_by_type(query_embedding, 'cancion', n_per_type),
+            'actividades': self._retrieve_by_type(query_embedding, 'actividad', n_per_type),
             'diagnostico_usuario': None,
             'plan_usuario': None
         }
@@ -78,7 +83,7 @@ class RAGRetriever:
             results['plan_usuario'] = user_docs.get('plan')
         
         # Log de resultados
-        logger.info(f"📚 Recuperados: {len(results['cuentos'])} cuentos, {len(results['canciones'])} canciones")
+        logger.info(f"📚 Recuperados: {len(results['cuentos'])} cuentos, {len(results['canciones'])} canciones, {len(results['actividades'])} actividades")
         
         return results
     
@@ -93,7 +98,7 @@ class RAGRetriever:
         
         Args:
             query_embedding: Embedding de la query
-            document_type: Tipo de documento (cuento, cancion, etc.)
+            document_type: Tipo de documento (cuento, cancion, actividad, etc.)
             n_results: Número de resultados
             
         Returns:

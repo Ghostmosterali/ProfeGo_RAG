@@ -1,7 +1,7 @@
 """
 Sistema RAG para ProfeGo
 Inicializa todos los componentes del sistema
-VERSIÓN CORREGIDA PARA WINDOWS
+VERSIÓN MEJORADA CON SOPORTE PARA ACTIVIDADES
 """
 
 import logging
@@ -11,7 +11,7 @@ from typing import Optional
 
 from .embeddings import GeminiEmbeddings
 from .vector_store import VectorStore
-from .document_processor import DocumentProcessor  # ✅ ESTA LÍNEA ESTABA FALTANDO
+from .document_processor import DocumentProcessor
 from .retriever import RAGRetriever
 from .generator import RAGPlanGenerator
 
@@ -27,7 +27,8 @@ class RAGSystem:
         self,
         vector_db_path: str = "./rag_data/vector_db",
         cuentos_dir: str = "./rag_data/cuentos",
-        canciones_dir: str = "./rag_data/canciones"
+        canciones_dir: str = "./rag_data/canciones",
+        actividades_dir: str = "./rag_data/actividades"
     ):
         """
         Inicializa el sistema RAG completo
@@ -36,12 +37,13 @@ class RAGSystem:
             vector_db_path: Ruta a la base de datos vectorial
             cuentos_dir: Directorio con cuentos generales
             canciones_dir: Directorio con canciones generales
+            actividades_dir: Directorio con actividades didácticas
         """
         logger.info("Inicializando Sistema RAG para ProfeGo...")
         
         # Crear directorios si no existen
         try:
-            for directory in [vector_db_path, cuentos_dir, canciones_dir]:
+            for directory in [vector_db_path, cuentos_dir, canciones_dir, actividades_dir]:
                 dir_path = Path(directory)
                 if not dir_path.exists():
                     dir_path.mkdir(parents=True, exist_ok=True)
@@ -68,6 +70,7 @@ class RAGSystem:
             # Directorios
             self.cuentos_dir = cuentos_dir
             self.canciones_dir = canciones_dir
+            self.actividades_dir = actividades_dir
             
             logger.info("Sistema RAG inicializado correctamente")
         except Exception as e:
@@ -76,7 +79,7 @@ class RAGSystem:
     
     def initialize_general_library(self) -> bool:
         """
-        Inicializa la biblioteca general (cuentos y canciones)
+        Inicializa la biblioteca general (cuentos, canciones y actividades)
         VERSIÓN OPTIMIZADA PARA MEMORIA
         """
         logger.info("Inicializando biblioteca general...")
@@ -154,6 +157,42 @@ class RAGSystem:
                     logger.info("No se encontraron chunks de canciones")
             except Exception as e:
                 logger.error(f"Error procesando canciones: {type(e).__name__}: {str(e)}")
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+            
+            # Procesar actividades
+            logger.info(f"Procesando actividades desde {self.actividades_dir}")
+            
+            try:
+                actividades_chunks = self.document_processor.process_directory(
+                    self.actividades_dir,
+                    document_type='actividad',
+                    recursive=True
+                )
+                
+                if actividades_chunks:
+                    batch_size = 3
+                    logger.info(f"Generando embeddings para {len(actividades_chunks)} chunks de actividades...")
+                    
+                    for i in range(0, len(actividades_chunks), batch_size):
+                        batch = actividades_chunks[i:i+batch_size]
+                        logger.info(f"Procesando lote {i//batch_size + 1}/{(len(actividades_chunks) + batch_size - 1)//batch_size}")
+                        
+                        batch_embeddings = self.embeddings.embed_documents(
+                            [chunk['text'] for chunk in batch]
+                        )
+                        
+                        self.vector_store.add_documents(batch, batch_embeddings)
+                        total_chunks += len(batch)
+                        
+                        del batch_embeddings
+                        gc.collect()
+                    
+                    logger.info(f"{len(actividades_chunks)} chunks de actividades indexados")
+                else:
+                    logger.info("No se encontraron chunks de actividades")
+            except Exception as e:
+                logger.error(f"Error procesando actividades: {type(e).__name__}: {str(e)}")
                 import traceback
                 logger.error(f"Traceback: {traceback.format_exc()}")
             
@@ -267,7 +306,7 @@ class RAGSystem:
                 plan_text=plan_text,
                 diagnostico_text=diagnostico_text,
                 user_email=user_email,
-                n_results=10
+                n_results=15
             )
             
             result = await self.generator.generate_plan_with_rag(
