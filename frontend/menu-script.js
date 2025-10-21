@@ -1213,24 +1213,60 @@ async function showRAGAnalysis(planId) {
         
         hideLoading();
         
-        console.log('📊 Respuesta RAG:', response); // Debug
+        console.log('📊 Respuesta RAG completa:', response);
         
+        // CASO 1: Plan sin RAG (success = false)
         if (!response.success) {
-            // Mostrar mensaje específico en el modal
+            content.innerHTML = `
+                <div class="rag-error-container">
+                    <div class="error-icon">📋</div>
+                    <h3>${response.message || 'Análisis RAG no disponible'}</h3>
+                    <div class="error-details">
+                        <h4>📌 Información del Plan:</h4>
+                        <p><strong>Nombre:</strong> ${escapeHtml(response.plan_name || 'N/A')}</p>
+                        
+                        <h4>💡 ¿Por qué no hay análisis RAG?</h4>
+                        <ul>
+                            <li>Este plan fue generado <strong>antes</strong> de implementar el sistema RAG</li>
+                            <li>O la biblioteca RAG estaba vacía cuando se generó el plan</li>
+                            <li>No se guardó metadata RAG en el archivo JSON</li>
+                        </ul>
+                        
+                        <h4>✅ ¿Cómo obtener análisis RAG?</h4>
+                        <ol>
+                            <li>Ve a la sección <strong>ARCHIVOS</strong></li>
+                            <li>Presiona <strong>"➕ AÑADIR PLAN"</strong></li>
+                            <li>Sube un nuevo plan de estudios</li>
+                            <li>El nuevo plan incluirá análisis RAG automáticamente</li>
+                        </ol>
+                        
+                        ${response.sugerencia ? `
+                            <div class="info-box">
+                                <strong>💬 Sugerencia:</strong>
+                                <p>${response.sugerencia}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <button class="btn btn-primary" onclick="document.getElementById('rag-analysis-modal').classList.remove('active')">
+                        Entendido
+                    </button>
+                </div>
+            `;
+            modal.classList.add('active');
+            return;
+        }
+        
+        // CASO 2: Datos incompletos
+        if (!response.analisis || !response.analisis.metricas_rag) {
+            console.error('❌ Estructura de datos incompleta:', response);
             content.innerHTML = `
                 <div class="rag-error-container">
                     <div class="error-icon">⚠️</div>
-                    <h3>Análisis RAG no disponible</h3>
-                    <p>${response.message || 'No se pudo realizar el análisis RAG para este plan.'}</p>
+                    <h3>Datos incompletos en la respuesta</h3>
+                    <p>El servidor devolvió una respuesta sin la estructura esperada.</p>
                     <div class="error-details">
-                        <h4>Posibles causas:</h4>
-                        <ul>
-                            <li>Este plan fue generado sin el sistema RAG activo</li>
-                            <li>No hay recursos en la biblioteca RAG (cuentos/canciones)</li>
-                            <li>El plan no contiene metadata RAG</li>
-                        </ul>
-                        <h4>Solución:</h4>
-                        <p>Genera un nuevo plan para que incluya análisis RAG automáticamente.</p>
+                        <h4>🔍 Datos recibidos:</h4>
+                        <pre style="max-height: 400px; overflow-y: auto; background: #f5f5f5; padding: 15px; border-radius: 8px;">${escapeHtml(JSON.stringify(response, null, 2))}</pre>
                     </div>
                     <button class="btn btn-primary" onclick="document.getElementById('rag-analysis-modal').classList.remove('active')">
                         Cerrar
@@ -1241,41 +1277,30 @@ async function showRAGAnalysis(planId) {
             return;
         }
         
-        // Verificar que tenemos los datos necesarios
-        if (!response.analisis || !response.analisis.metricas_rag) {
-            content.innerHTML = `
-                <div class="rag-error-container">
-                    <div class="error-icon">❌</div>
-                    <h3>Error en los datos RAG</h3>
-                    <p>La respuesta del servidor no contiene los datos esperados.</p>
-                    <button class="btn btn-primary" onclick="document.getElementById('rag-analysis-modal').classList.remove('active')">
-                        Cerrar
-                    </button>
-                </div>
-            `;
-            modal.classList.add('active');
-            return;
-        }
-        
-        // Mostrar análisis
+        // CASO 3: Éxito - Mostrar análisis completo
+        console.log('✅ Mostrando análisis RAG');
         displayRAGAnalysis(response);
+        modal.classList.add('active');
         
     } catch (error) {
         hideLoading();
-        console.error('❌ Error completo:', error);
+        console.error('❌ Error en showRAGAnalysis:', error);
         
-        // Mostrar error detallado en el modal
         content.innerHTML = `
             <div class="rag-error-container">
                 <div class="error-icon">🔴</div>
                 <h3>Error al analizar RAG</h3>
-                <p>Ocurrió un error al intentar analizar el plan con RAG:</p>
+                <p>Ocurrió un error inesperado al intentar obtener el análisis:</p>
                 <div class="error-message">
-                    <code>${error.message || 'Error desconocido'}</code>
+                    <code>${escapeHtml(error.message || 'Error desconocido')}</code>
                 </div>
                 <div class="error-details">
-                    <h4>Información técnica:</h4>
-                    <pre>${JSON.stringify(error, null, 2)}</pre>
+                    <h4>🔍 Detalles técnicos:</h4>
+                    <pre style="max-height: 300px; overflow-y: auto; background: #f5f5f5; padding: 15px; border-radius: 8px;">${escapeHtml(JSON.stringify({
+                        type: error.name || 'Error',
+                        message: error.message,
+                        stack: error.stack ? error.stack.split('\n').slice(0, 5).join('\n') : 'N/A'
+                    }, null, 2))}</pre>
                 </div>
                 <button class="btn btn-primary" onclick="document.getElementById('rag-analysis-modal').classList.remove('active')">
                     Cerrar
@@ -1290,8 +1315,31 @@ function displayRAGAnalysis(data) {
     const modal = document.getElementById('rag-analysis-modal');
     const content = document.getElementById('rag-analysis-content');
     
+    // VALIDACIÓN 1: Verificar que existe data
+    if (!data) {
+        console.error('❌ data es null o undefined');
+        content.innerHTML = '<div class="rag-error-container"><p>Error: no se recibieron datos</p></div>';
+        return;
+    }
+    
+    // VALIDACIÓN 2: Verificar que existe analisis
+    if (!data.analisis) {
+        console.error('❌ data.analisis no existe:', data);
+        content.innerHTML = '<div class="rag-error-container"><p>Error: falta el objeto analisis</p></div>';
+        return;
+    }
+    
     const analisis = data.analisis;
-    const metricas = analisis.metricas_rag;
+    
+    // VALIDACIÓN 3: Verificar métricas RAG
+    const metricas = analisis.metricas_rag || {
+        total_recursos_rag: 0,
+        recursos_utilizados: 0,
+        porcentaje_uso_rag: 0,
+        similitud_promedio: 0
+    };
+    
+    console.log('📊 Métricas RAG:', metricas);
     
     let html = `
         <div class="rag-analysis-summary">
@@ -1300,28 +1348,28 @@ function displayRAGAnalysis(data) {
                 <div class="metric-card">
                     <div class="metric-icon">📚</div>
                     <div class="metric-info">
-                        <div class="metric-value">${metricas.total_recursos_rag}</div>
+                        <div class="metric-value">${metricas.total_recursos_rag || 0}</div>
                         <div class="metric-label">Recursos RAG Recuperados</div>
                     </div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-icon">✅</div>
                     <div class="metric-info">
-                        <div class="metric-value">${metricas.recursos_utilizados}</div>
+                        <div class="metric-value">${metricas.recursos_utilizados || 0}</div>
                         <div class="metric-label">Recursos Utilizados</div>
                     </div>
                 </div>
                 <div class="metric-card highlight">
                     <div class="metric-icon">📊</div>
                     <div class="metric-info">
-                        <div class="metric-value">${metricas.porcentaje_uso_rag}%</div>
+                        <div class="metric-value">${metricas.porcentaje_uso_rag || 0}%</div>
                         <div class="metric-label">Uso de RAG en el Plan</div>
                     </div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-icon">🎯</div>
                     <div class="metric-info">
-                        <div class="metric-value">${metricas.similitud_promedio}%</div>
+                        <div class="metric-value">${metricas.similitud_promedio || 0}%</div>
                         <div class="metric-label">Similitud Promedio</div>
                     </div>
                 </div>
@@ -1335,10 +1383,10 @@ function displayRAGAnalysis(data) {
                     <svg viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="40" fill="none" stroke="#e0e0e0" stroke-width="20"/>
                         <circle cx="50" cy="50" r="40" fill="none" stroke="#4CAF50" stroke-width="20"
-                            stroke-dasharray="${metricas.porcentaje_uso_rag * 2.51} 251.2"
+                            stroke-dasharray="${(metricas.porcentaje_uso_rag || 0) * 2.51} 251.2"
                             transform="rotate(-90 50 50)"/>
                         <text x="50" y="50" text-anchor="middle" dy=".3em" font-size="20" font-weight="bold" fill="#4CAF50">
-                            ${metricas.porcentaje_uso_rag}%
+                            ${metricas.porcentaje_uso_rag || 0}%
                         </text>
                     </svg>
                 </div>
@@ -1357,7 +1405,7 @@ function displayRAGAnalysis(data) {
     `;
     
     // Recursos altamente relevantes
-    if (analisis.recursos_altamente_relevantes.length > 0) {
+    if (analisis.recursos_altamente_relevantes && analisis.recursos_altamente_relevantes.length > 0) {
         html += `
             <div class="rag-recursos-section">
                 <h3>🎯 Recursos Altamente Relevantes (Similitud ≥ 65%)</h3>
@@ -1367,8 +1415,11 @@ function displayRAGAnalysis(data) {
                 </p>
         `;
         
-        data.recursos_completos.forEach(recurso => {
-            const nivelClass = recurso.similitud_nivel.toLowerCase().replace('-', '_');
+        // Verificar que existe data.recursos_completos
+        const recursos_completos = data.recursos_completos || analisis.recursos_altamente_relevantes;
+        
+        recursos_completos.forEach(recurso => {
+            const nivelClass = (recurso.similitud_nivel || 'MEDIA').toLowerCase().replace('-', '_');
             const icon = recurso.tipo === 'cuento' ? '📖' : '🎵';
             
             html += `
@@ -1377,51 +1428,65 @@ function displayRAGAnalysis(data) {
                         <div class="recurso-title">
                             <span class="recurso-icon-big">${icon}</span>
                             <div>
-                                <h4>${escapeHtml(recurso.titulo)}</h4>
+                                <h4>${escapeHtml(recurso.titulo || 'Sin título')}</h4>
                                 <div class="recurso-badges">
-                                    <span class="badge badge-${recurso.tipo}">${recurso.tipo.toUpperCase()}</span>
-                                    <span class="badge badge-fuente">${recurso.fuente}</span>
-                                    <span class="badge badge-acceso">${recurso.acceso}</span>
+                                    <span class="badge badge-${recurso.tipo || 'recurso'}">${(recurso.tipo || 'RECURSO').toUpperCase()}</span>
+                                    <span class="badge badge-fuente">${escapeHtml(recurso.fuente || 'N/A')}</span>
+                                    <span class="badge badge-acceso">${escapeHtml(recurso.acceso || 'N/A')}</span>
                                 </div>
                             </div>
                         </div>
                         <div class="similitud-score ${nivelClass}">
-                            <div class="score-value">${recurso.similitud_porcentaje}%</div>
-                            <div class="score-label">${recurso.similitud_nivel}</div>
+                            <div class="score-value">${recurso.similitud_porcentaje || 0}%</div>
+                            <div class="score-label">${recurso.similitud_nivel || 'N/A'}</div>
                         </div>
                     </div>
                     
                     <div class="recurso-similitud-bar">
-                        <div class="similitud-fill" style="width: ${recurso.similitud_porcentaje}%;"></div>
+                        <div class="similitud-fill" style="width: ${recurso.similitud_porcentaje || 0}%;"></div>
                     </div>
                     
                     <div class="recurso-content-preview">
                         <h5>📝 Fragmento del contenido:</h5>
-                        <div class="content-preview-text">${escapeHtml(recurso.fragmento)}</div>
-                        <button class="btn-expand" onclick="toggleFullContent(this, '${escapeHtml(recurso.contenido_completo)}')">
-                            Ver contenido completo ▼
-                        </button>
-                        <div class="content-full hidden"></div>
+                        <div class="content-preview-text">${escapeHtml(recurso.fragmento || 'Sin preview')}</div>
+                        ${recurso.contenido_completo ? `
+                            <button class="btn-expand" onclick="toggleFullContent(this, '${escapeHtml(recurso.contenido_completo).replace(/'/g, "\\'")}')">
+                                Ver contenido completo ▼
+                            </button>
+                            <div class="content-full hidden"></div>
+                        ` : ''}
                     </div>
                     
-                    <div class="recurso-markdown-section">
-                        <h5>📋 Formato Markdown para Integración:</h5>
-                        <div class="markdown-preview">
-                            <pre>${escapeHtml(recurso.markdown_formato)}</pre>
+                    ${recurso.markdown_formato ? `
+                        <div class="recurso-markdown-section">
+                            <h5>📋 Formato Markdown para Integración:</h5>
+                            <div class="markdown-preview">
+                                <pre>${escapeHtml(recurso.markdown_formato)}</pre>
+                            </div>
+                            <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${escapeHtml(recurso.markdown_formato).replace(/'/g, "\\'")}')">
+                                📋 Copiar Markdown
+                            </button>
                         </div>
-                        <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${escapeHtml(recurso.markdown_formato).replace(/'/g, "\\'")}')">
-                            📋 Copiar Markdown
-                        </button>
-                    </div>
+                    ` : ''}
                 </div>
             `;
         });
         
         html += '</div>';
+    } else {
+        html += `
+            <div class="rag-recursos-section">
+                <div class="empty-state">
+                    <div class="empty-icon">📚</div>
+                    <h3>No hay recursos altamente relevantes</h3>
+                    <p>No se encontraron recursos con similitud ≥ 65%</p>
+                </div>
+            </div>
+        `;
     }
     
     // Análisis por módulo
-    if (analisis.recursos_por_modulo.length > 0) {
+    if (analisis.recursos_por_modulo && analisis.recursos_por_modulo.length > 0) {
         html += `
             <div class="rag-modulos-section">
                 <h3>🎯 Recursos por Módulo</h3>
@@ -1434,22 +1499,26 @@ function displayRAGAnalysis(data) {
             html += `
                 <div class="modulo-rag-card">
                     <div class="modulo-rag-header">
-                        <span class="modulo-number">Módulo ${modulo.numero}</span>
-                        <h4>${escapeHtml(modulo.nombre)}</h4>
+                        <span class="modulo-number">Módulo ${modulo.numero || '?'}</span>
+                        <h4>${escapeHtml(modulo.nombre || 'Sin nombre')}</h4>
                     </div>
                     <div class="modulo-recursos-list">
             `;
             
-            modulo.recursos_relacionados.forEach(recurso => {
-                const icon = recurso.tipo === 'cuento' ? '📖' : '🎵';
-                html += `
-                    <div class="modulo-recurso-item">
-                        <span class="recurso-icon-small">${icon}</span>
-                        <span class="recurso-name">${escapeHtml(recurso.titulo)}</span>
-                        <span class="recurso-similitud-small">${recurso.similitud}%</span>
-                    </div>
-                `;
-            });
+            if (modulo.recursos_relacionados && modulo.recursos_relacionados.length > 0) {
+                modulo.recursos_relacionados.forEach(recurso => {
+                    const icon = recurso.tipo === 'cuento' ? '📖' : '🎵';
+                    html += `
+                        <div class="modulo-recurso-item">
+                            <span class="recurso-icon-small">${icon}</span>
+                            <span class="recurso-name">${escapeHtml(recurso.titulo || 'Sin título')}</span>
+                            <span class="recurso-similitud-small">${recurso.similitud || 0}%</span>
+                        </div>
+                    `;
+                });
+            } else {
+                html += '<p class="empty-text">No hay recursos relacionados</p>';
+            }
             
             html += `
                     </div>
@@ -1467,19 +1536,22 @@ function displayRAGAnalysis(data) {
             <div class="interpretation-content">
     `;
     
-    if (metricas.porcentaje_uso_rag >= 70) {
+    const porcentaje = metricas.porcentaje_uso_rag || 0;
+    const similitud = metricas.similitud_promedio || 0;
+    
+    if (porcentaje >= 70) {
         html += `
             <div class="alert alert-success">
                 <strong>✅ Excelente uso de RAG</strong>
-                <p>El ${metricas.porcentaje_uso_rag}% del plan utiliza recursos verificados de la biblioteca digital. 
+                <p>El ${porcentaje}% del plan utiliza recursos verificados de la biblioteca digital. 
                 Esto garantiza que las actividades están basadas en materiales reales y disponibles.</p>
             </div>
         `;
-    } else if (metricas.porcentaje_uso_rag >= 40) {
+    } else if (porcentaje >= 40) {
         html += `
             <div class="alert alert-info">
                 <strong>ℹ️ Buen uso de RAG</strong>
-                <p>El ${metricas.porcentaje_uso_rag}% del plan integra recursos de la biblioteca. 
+                <p>El ${porcentaje}% del plan integra recursos de la biblioteca. 
                 Se complementa con recursos adicionales sugeridos por la IA.</p>
             </div>
         `;
@@ -1487,17 +1559,17 @@ function displayRAGAnalysis(data) {
         html += `
             <div class="alert alert-warning">
                 <strong>⚠️ Uso limitado de RAG</strong>
-                <p>Solo el ${metricas.porcentaje_uso_rag}% del plan usa recursos de la biblioteca. 
+                <p>Solo el ${porcentaje}% del plan usa recursos de la biblioteca. 
                 Considera agregar más cuentos y canciones a la biblioteca para mejorar futuras generaciones.</p>
             </div>
         `;
     }
     
-    if (metricas.similitud_promedio >= 75) {
+    if (similitud >= 75) {
         html += `
             <div class="alert alert-success">
                 <strong>🎯 Alta relevancia semántica</strong>
-                <p>Los recursos de la biblioteca tienen una similitud promedio del ${metricas.similitud_promedio}% con el plan, 
+                <p>Los recursos de la biblioteca tienen una similitud promedio del ${similitud}% con el plan, 
                 lo que indica una excelente coincidencia temática.</p>
             </div>
         `;
@@ -1509,7 +1581,6 @@ function displayRAGAnalysis(data) {
     `;
     
     content.innerHTML = html;
-    modal.classList.add('active');
 }
 
 function toggleFullContent(button, fullContent) {

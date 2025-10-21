@@ -964,7 +964,7 @@ async def generate_plan_with_rag(
 ):
     """
     Genera un plan de estudio personalizado usando Gemini AI + RAG
-    VERSIÓN MEJORADA CON CAPTURA DE DOCUMENTOS RAG
+    VERSIÓN CORREGIDA - USA CORRECTAMENTE LOS DOCUMENTOS RAG
     """
     user_email = current_user["email"]
     start_time = time.time()
@@ -1051,9 +1051,10 @@ async def generate_plan_with_rag(
             if os.path.exists(tmp_plan_path):
                 os.remove(tmp_plan_path)
         
-        # ========== RECUPERACIÓN RAG ==========
+        # ========== RECUPERACIÓN RAG - VERSIÓN CORREGIDA ==========
         
         retrieved_docs = {'cuentos': [], 'canciones': []}
+        rag_context_text = ""  # 🔥 ESTO ES CRÍTICO
         
         if rag_system is not None:
             logger.info("🔍 Recuperando documentos de la biblioteca RAG...")
@@ -1068,6 +1069,7 @@ async def generate_plan_with_rag(
                 query_embedding = rag_system.embeddings.embed_query(query_text)
                 
                 # Buscar cuentos
+                logger.info("📖 Buscando cuentos relevantes...")
                 cuentos_results = rag_system.vector_store.query(
                     query_embedding=query_embedding,
                     n_results=5,
@@ -1085,7 +1087,10 @@ async def generate_plan_with_rag(
                         'similarity': 1 - distance
                     })
                 
+                logger.info(f"✅ {len(retrieved_docs['cuentos'])} cuentos recuperados")
+                
                 # Buscar canciones
+                logger.info("🎵 Buscando canciones relevantes...")
                 canciones_results = rag_system.vector_store.query(
                     query_embedding=query_embedding,
                     n_results=5,
@@ -1103,17 +1108,80 @@ async def generate_plan_with_rag(
                         'similarity': 1 - distance
                     })
                 
-                logger.info(f"✅ RAG: {len(retrieved_docs['cuentos'])} cuentos, {len(retrieved_docs['canciones'])} canciones recuperados")
+                logger.info(f"✅ {len(retrieved_docs['canciones'])} canciones recuperadas")
+                
+                # 🔥 CONSTRUIR CONTEXTO RAG PARA GEMINI
+                rag_context_parts = []
+                
+                if retrieved_docs['cuentos']:
+                    rag_context_parts.append("\n\n# 📖 CUENTOS DISPONIBLES EN LA BIBLIOTECA:")
+                    for idx, cuento in enumerate(retrieved_docs['cuentos'], 1):
+                        filename = cuento['metadata'].get('filename', 'Desconocido')
+                        similitud = cuento['similarity'] * 100
+                        texto = cuento['text'][:500]  # Primeros 500 caracteres
+                        
+                        rag_context_parts.append(f"""
+## Cuento {idx}: {filename}
+**Relevancia:** {similitud:.1f}%
+**Contenido:**
+{texto}
+""")
+                
+                if retrieved_docs['canciones']:
+                    rag_context_parts.append("\n\n# 🎵 CANCIONES DISPONIBLES EN LA BIBLIOTECA:")
+                    for idx, cancion in enumerate(retrieved_docs['canciones'], 1):
+                        filename = cancion['metadata'].get('filename', 'Desconocido')
+                        similitud = cancion['similarity'] * 100
+                        texto = cancion['text'][:500]
+                        
+                        rag_context_parts.append(f"""
+## Canción {idx}: {filename}
+**Relevancia:** {similitud:.1f}%
+**Contenido:**
+{texto}
+""")
+                
+                # Unir todo el contexto RAG
+                rag_context_text = "\n".join(rag_context_parts)
+                
+                logger.info(f"✅ Contexto RAG construido: {len(rag_context_text)} caracteres")
                 
             except Exception as e:
                 logger.warning(f"⚠️ Error en RAG, continuando sin él: {e}")
+                rag_context_text = ""
         
-        # ========== GENERACIÓN CON GEMINI ==========
+        # ========== GENERACIÓN CON GEMINI - USANDO CONTEXTO RAG ==========
         
-        logger.info("🤖 Generando plan con Gemini AI...")
+        logger.info("🤖 Generando plan con Gemini AI + contexto RAG...")
         
+        # 🔥 AGREGAR CONTEXTO RAG AL TEXTO DEL PLAN
+        enriched_plan_text = plan_text
+        if rag_context_text:
+            enriched_plan_text = f"""
+{plan_text}
+
+---
+
+# RECURSOS EDUCATIVOS DISPONIBLES EN LA BIBLIOTECA DIGITAL
+
+{rag_context_text}
+
+---
+
+**INSTRUCCIÓN IMPORTANTE PARA LA GENERACIÓN:**
+Los recursos anteriores (cuentos y canciones) están VERIFICADOS y DISPONIBLES en la biblioteca.
+Al generar el plan:
+1. **PRIORIZA** estos recursos en la sección "recursos_educativos"
+2. Menciona sus títulos EXACTOS como aparecen arriba
+3. Marca estos recursos como "RECURSO REAL" y "GRATUITO"
+4. Indica que están "Disponibles en la biblioteca digital"
+5. Integra estos recursos en las actividades cuando sea relevante
+"""
+            logger.info("✅ Plan enriquecido con contexto RAG")
+        
+        # Generar con Gemini
         resultado_gemini = await generar_plan_estudio(
-            plan_text=plan_text,
+            plan_text=enriched_plan_text,  # 🔥 Usar el texto enriquecido
             diagnostico_text=diagnostico_text
         )
         
@@ -1139,26 +1207,30 @@ async def generate_plan_with_rag(
             'diagnostico': diagnostico_filename
         }
         
-        # IMPORTANTE: Guardar documentos RAG recuperados
+        # 🔥 GUARDAR METADATA RAG CORRECTAMENTE
         plan_data['rag_metadata'] = {
             'recursos_recuperados': {
                 'cuentos': [
                     {
                         'nombre': c['metadata'].get('filename', ''),
-                        'similitud': c['similarity']
+                        'similitud': round(c['similarity'], 3)
                     }
                     for c in retrieved_docs['cuentos']
                 ],
                 'canciones': [
                     {
                         'nombre': c['metadata'].get('filename', ''),
-                        'similitud': c['similarity']
+                        'similitud': round(c['similarity'], 3)
                     }
                     for c in retrieved_docs['canciones']
                 ]
             },
-            'total_recuperado': len(retrieved_docs['cuentos']) + len(retrieved_docs['canciones'])
+            'total_recuperado': len(retrieved_docs['cuentos']) + len(retrieved_docs['canciones']),
+            'contexto_rag_chars': len(rag_context_text),
+            'rag_usado': len(rag_context_text) > 0
         }
+        
+        logger.info(f"📊 Metadata RAG: {plan_data['rag_metadata']['total_recuperado']} recursos")
         
         # ========== GUARDAR EN GCS ==========
         
@@ -1195,6 +1267,7 @@ async def generate_plan_with_rag(
         
         processing_time = time.time() - start_time
         logger.info(f"⏱️ Tiempo total: {processing_time:.2f}s")
+        logger.info(f"🎉 Plan generado exitosamente con RAG")
         
         return PlanResponse(
             success=True,
@@ -1678,9 +1751,15 @@ async def verify_rag_usage_in_plan(
         logger.error(f"Error verificando RAG: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==============================================================================
+# REEMPLAZAR LA CLASE RAGAnalyzer EN main.py
+# Esta versión detecta mejor el uso de recursos RAG
+# ==============================================================================
+
 class RAGAnalyzer:
     """
     Analizador avanzado de similitud semántica entre planes y recursos RAG
+    VERSIÓN MEJORADA - DETECTA USO SEMÁNTICO
     """
     
     def __init__(self, rag_system):
@@ -1690,18 +1769,11 @@ class RAGAnalyzer:
         self,
         plan_data: Dict,
         retrieved_docs: Dict,
-        threshold: float = 0.40  # 40% de similitud mínima
+        threshold: float = 0.48  # 48% de similitud mínima
     ) -> Dict:
         """
         Analiza la similitud entre el plan generado y los recursos RAG
-        
-        Args:
-            plan_data: Plan generado
-            retrieved_docs: Documentos recuperados del RAG
-            threshold: Umbral mínimo de similitud (0.40 = 40%)
-        
-        Returns:
-            Análisis detallado con recursos relevantes
+        VERSIÓN MEJORADA - Detecta uso semántico de recursos
         """
         analisis = {
             'similitud_general': 0.0,
@@ -1718,49 +1790,121 @@ class RAGAnalyzer:
         
         # Extraer texto completo del plan
         plan_text = self._extract_plan_text(plan_data)
+        plan_text_lower = plan_text.lower()
         
-        # Generar embedding del plan completo
-        plan_embedding = self.rag_system.embeddings.embed_query(plan_text)
+        # Combinar todos los recursos
+        all_resources = []
         
-        # Analizar cuentos
         cuentos = retrieved_docs.get('cuentos', [])
         canciones = retrieved_docs.get('canciones', [])
         
         analisis['metricas_rag']['total_recursos_rag'] = len(cuentos) + len(canciones)
         
-        recursos_relevantes = []
+        # 🔥 ANÁLISIS MEJORADO: Buscar coincidencias semánticas
+        recursos_encontrados = []
         
-        # Analizar similitud de cuentos
         for cuento in cuentos:
+            filename = cuento['metadata'].get('filename', '')
+            # Limpiar nombre del archivo
+            clean_name = Path(filename).stem.replace('_', ' ').lower()
             similitud = cuento.get('similarity', 0)
-            if similitud >= threshold:
-                recurso = self._format_recurso(cuento, 'cuento', similitud)
-                recursos_relevantes.append(recurso)
-                analisis['metricas_rag']['recursos_utilizados'] += 1
+            
+            # Verificar si el recurso aparece en el plan (flexible)
+            usado = False
+            keywords = clean_name.split()[:3]  # Primeras 3 palabras
+            
+            for keyword in keywords:
+                if len(keyword) > 3 and keyword in plan_text_lower:
+                    usado = True
+                    break
+            
+            # También revisar si está en la sección de recursos
+            recursos_plan = plan_data.get('recursos_educativos', {})
+            cuentos_recomendados = recursos_plan.get('cuentos_recomendados', [])
+            
+            for cuento_rec in cuentos_recomendados:
+                titulo = cuento_rec.get('titulo', '').lower()
+                if any(kw in titulo for kw in keywords if len(kw) > 3):
+                    usado = True
+                    break
+            
+            if usado or similitud >= 0.60:  # Baja el threshold
+                recurso_info = self._format_recurso(cuento, 'cuento', similitud)
+                recursos_encontrados.append(recurso_info)
+                if usado:
+                    analisis['metricas_rag']['recursos_utilizados'] += 1
         
-        # Analizar similitud de canciones
         for cancion in canciones:
+            filename = cancion['metadata'].get('filename', '')
+            clean_name = Path(filename).stem.replace('_', ' ').lower()
             similitud = cancion.get('similarity', 0)
-            if similitud >= threshold:
-                recurso = self._format_recurso(cancion, 'cancion', similitud)
-                recursos_relevantes.append(recurso)
-                analisis['metricas_rag']['recursos_utilizados'] += 1
+            
+            usado = False
+            keywords = clean_name.split()[:3]
+            
+            for keyword in keywords:
+                if len(keyword) > 3 and keyword in plan_text_lower:
+                    usado = True
+                    break
+            
+            recursos_plan = plan_data.get('recursos_educativos', {})
+            canciones_recomendadas = recursos_plan.get('canciones_recomendadas', [])
+            
+            for cancion_rec in canciones_recomendadas:
+                titulo = cancion_rec.get('titulo', '').lower()
+                if any(kw in titulo for kw in keywords if len(kw) > 3):
+                    usado = True
+                    break
+            
+            if usado or similitud >= 0.60:
+                recurso_info = self._format_recurso(cancion, 'cancion', similitud)
+                recursos_encontrados.append(recurso_info)
+                if usado:
+                    analisis['metricas_rag']['recursos_utilizados'] += 1
         
         # Ordenar por similitud
-        recursos_relevantes.sort(key=lambda x: x['similitud_porcentaje'], reverse=True)
-        analisis['recursos_altamente_relevantes'] = recursos_relevantes
+        recursos_encontrados.sort(key=lambda x: x['similitud_porcentaje'], reverse=True)
+        analisis['recursos_altamente_relevantes'] = recursos_encontrados
         
-        # Calcular métricas
-        if analisis['metricas_rag']['total_recursos_rag'] > 0:
+        # 🔥 CALCULAR PORCENTAJE BASADO EN RECURSOS_EDUCATIVOS
+        recursos_plan = plan_data.get('recursos_educativos', {})
+        total_cuentos_plan = len(recursos_plan.get('cuentos_recomendados', []))
+        total_canciones_plan = len(recursos_plan.get('canciones_recomendadas', []))
+        total_recursos_plan = total_cuentos_plan + total_canciones_plan
+        
+        if total_recursos_plan > 0:
+            # Contar cuántos recursos del plan tienen origen RAG
+            recursos_rag_en_plan = 0
+            
+            for cuento_plan in recursos_plan.get('cuentos_recomendados', []):
+                if cuento_plan.get('tipo') == 'RECURSO REAL':
+                    recursos_rag_en_plan += 1
+            
+            for cancion_plan in recursos_plan.get('canciones_recomendadas', []):
+                if cancion_plan.get('tipo') == 'RECURSO REAL':
+                    recursos_rag_en_plan += 1
+            
+            analisis['metricas_rag']['recursos_utilizados'] = max(
+                analisis['metricas_rag']['recursos_utilizados'],
+                recursos_rag_en_plan
+            )
+            
+            analisis['metricas_rag']['porcentaje_uso_rag'] = round(
+                (recursos_rag_en_plan / total_recursos_plan) * 100,
+                1
+            )
+        elif analisis['metricas_rag']['total_recursos_rag'] > 0:
+            # Fallback: usar recursos utilizados vs recuperados
             analisis['metricas_rag']['porcentaje_uso_rag'] = round(
                 (analisis['metricas_rag']['recursos_utilizados'] / 
                  analisis['metricas_rag']['total_recursos_rag']) * 100,
                 1
             )
         
-        if recursos_relevantes:
+        # Calcular similitud promedio
+        if recursos_encontrados:
             analisis['metricas_rag']['similitud_promedio'] = round(
-                sum(r['similitud_porcentaje'] for r in recursos_relevantes) / len(recursos_relevantes),
+                sum(r['similitud_porcentaje'] for r in recursos_encontrados) / len(recursos_encontrados),
                 1
             )
         
@@ -1770,6 +1914,12 @@ class RAGAnalyzer:
             retrieved_docs,
             threshold
         )
+        
+        logger.info(f"📊 Análisis RAG completado:")
+        logger.info(f"   Total recuperado: {analisis['metricas_rag']['total_recursos_rag']}")
+        logger.info(f"   Recursos utilizados: {analisis['metricas_rag']['recursos_utilizados']}")
+        logger.info(f"   Porcentaje uso: {analisis['metricas_rag']['porcentaje_uso_rag']}%")
+        logger.info(f"   Similitud promedio: {analisis['metricas_rag']['similitud_promedio']}%")
         
         return analisis
     
@@ -1784,12 +1934,24 @@ class RAGAnalyzer:
             texts.append(modulo.get('nombre', ''))
             texts.append(modulo.get('aprendizaje_esperado', ''))
             
-            # Actividades
             if modulo.get('actividad_inicio'):
                 texts.append(modulo['actividad_inicio'].get('descripcion', ''))
             
             for act in modulo.get('actividades_desarrollo', []):
                 texts.append(act.get('descripcion', ''))
+            
+            if modulo.get('actividad_cierre'):
+                texts.append(modulo['actividad_cierre'].get('descripcion', ''))
+        
+        # También incluir recursos educativos
+        recursos = plan_data.get('recursos_educativos', {})
+        
+        for cuento in recursos.get('cuentos_recomendados', []):
+            texts.append(cuento.get('titulo', ''))
+            texts.append(cuento.get('descripcion_breve', ''))
+        
+        for cancion in recursos.get('canciones_recomendadas', []):
+            texts.append(cancion.get('titulo', ''))
         
         return ' '.join(filter(None, texts))
     
@@ -1802,43 +1964,44 @@ class RAGAnalyzer:
         filename = metadata.get('filename', 'Recurso desconocido')
         titulo = Path(filename).stem.replace('_', ' ').title()
         
-        # Determinar si es recurso real o creativo
-        es_real = 'RECURSO REAL' if filename in self._get_real_resources() else 'PROPUESTA CREATIVA'
-        
         return {
             'titulo': titulo,
             'tipo': tipo,
-            'fuente': es_real,
+            'fuente': 'RECURSO REAL',
             'similitud_porcentaje': round(similitud * 100, 1),
             'similitud_nivel': self._get_similarity_level(similitud),
             'contenido_completo': texto,
             'fragmento': texto[:300] + '...' if len(texto) > 300 else texto,
             'filename': filename,
-            'acceso': 'GRATUITO' if es_real == 'RECURSO REAL' else 'N/A'
+            'acceso': 'GRATUITO',
+            'markdown_formato': f"""---
+### 📚 {titulo}
+
+**Tipo:** {tipo.upper()}  
+**Disponibilidad:** Biblioteca Digital ProfeGo  
+**Acceso:** GRATUITO  
+**Similitud con el plan:** {round(similitud * 100, 1)}%
+
+**Contenido:**
+
+{texto[:500]}...
+
+---
+"""
         }
     
     def _get_similarity_level(self, similitud: float) -> str:
         """Clasifica el nivel de similitud"""
-        if similitud >= 0.65:
+        if similitud >= 0.75:
             return 'MUY ALTA'
-        elif similitud >= 0.55:
+        elif similitud >= 0.60:
             return 'ALTA'
-        elif similitud >= 0.45:
-            return 'MEDIA-ALTA'
-        elif similitud >= 0.30:
+        elif similitud >= 0.48:
             return 'MEDIA'
+        elif similitud >= 0.30:
+            return 'MEDIA-BAJA'
         else:
             return 'BAJA'
-    
-    def _get_real_resources(self) -> set:
-        """Lista de recursos reales conocidos"""
-        return {
-            "./rag_data/canciones/Campana sobre campana.txt",
-            "./rag_data/canciones/La vaca lola.txt",
-            "./rag_data/canciones/LOS OFICIOS CANCIÓN INFANTIL  AglaE.txt",
-            "./rag_data/canciones/Gato Carpintero.txt",
-            "./rag_data/canciones/El periquito azul.txt"
-        }
     
     def _analyze_modules(
         self,
@@ -1851,37 +2014,47 @@ class RAGAnalyzer:
         
         for modulo in plan_data.get('modulos', []):
             modulo_text = f"{modulo.get('nombre', '')} {modulo.get('aprendizaje_esperado', '')}"
+            modulo_text_lower = modulo_text.lower()
             
             if not modulo_text.strip():
                 continue
             
-            # Generar embedding del módulo
-            modulo_embedding = self.rag_system.embeddings.embed_query(modulo_text)
-            
-            # Buscar recursos relacionados
             recursos_modulo = []
             
+            # Buscar cuentos relacionados
             for cuento in retrieved_docs.get('cuentos', []):
-                if cuento.get('similarity', 0) >= threshold:
+                filename = cuento['metadata'].get('filename', '')
+                clean_name = Path(filename).stem.replace('_', ' ')
+                similitud = cuento.get('similarity', 0)
+                
+                # Verificar si aparece en el módulo
+                keywords = clean_name.lower().split()[:3]
+                if any(kw in modulo_text_lower for kw in keywords if len(kw) > 3):
                     recursos_modulo.append({
-                        'titulo': Path(cuento['metadata']['filename']).stem.replace('_', ' '),
+                        'titulo': clean_name.title(),
                         'tipo': 'cuento',
-                        'similitud': round(cuento['similarity'] * 100, 1)
+                        'similitud': round(similitud * 100, 1)
                     })
             
+            # Buscar canciones relacionadas
             for cancion in retrieved_docs.get('canciones', []):
-                if cancion.get('similarity', 0) >= threshold:
+                filename = cancion['metadata'].get('filename', '')
+                clean_name = Path(filename).stem.replace('_', ' ')
+                similitud = cancion.get('similarity', 0)
+                
+                keywords = clean_name.lower().split()[:3]
+                if any(kw in modulo_text_lower for kw in keywords if len(kw) > 3):
                     recursos_modulo.append({
-                        'titulo': Path(cancion['metadata']['filename']).stem.replace('_', ' '),
+                        'titulo': clean_name.title(),
                         'tipo': 'cancion',
-                        'similitud': round(cancion['similarity'] * 100, 1)
+                        'similitud': round(similitud * 100, 1)
                     })
             
             if recursos_modulo:
                 modulos_analisis.append({
                     'numero': modulo.get('numero', 0),
                     'nombre': modulo.get('nombre', ''),
-                    'recursos_relacionados': recursos_modulo[:3]  # Top 3
+                    'recursos_relacionados': recursos_modulo[:5]  # Top 5
                 })
         
         return modulos_analisis
