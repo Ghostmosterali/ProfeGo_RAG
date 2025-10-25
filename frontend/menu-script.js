@@ -503,7 +503,7 @@ function createPlanCard(plan) {
                     👁️ Ver
                 </button>
                 <button class="btn-action btn-rag-analysis" onclick="showRAGAnalysis('${plan.plan_id}')" title="Análisis RAG">
-                    🔍 RAG
+                    🔍 Biblio-Go
                 </button>
                 <button class="btn-action btn-download" onclick="downloadPlan('${plan.plan_id}')" title="Descargar Word">
                     📥 Word
