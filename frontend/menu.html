@@ -3,7 +3,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ProfeGo - Tu biblioteca personal</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/frontend/styles.css">
 </head>
 <body>
     <!-- Aplicación Principal -->
@@ -57,22 +57,26 @@
             <div id="archivos-content" class="content-section hidden">
                 <div class="files-container">
                     <!-- NUEVO: Botón principal para generar planes -->
+                    <h2 class="library-title">📚 Mi Biblioteca</h2>
+
                     <div class="generate-plan-section">
                         <button id="generate-plan-btn" class="btn btn-generate-plan">
                             ➕ AÑADIR PLAN
                         </button>
                         <p class="section-help-text">Sube tu plan de estudios y diagnóstico para generar módulos personalizados</p>
                     </div>
-                    
+
                     <div class="divider"></div>
                     
                     <div class="upload-section">
+                        <!----
                         <label for="file-input" class="upload-btn">📤 Subir archivos adicionales</label>
+                        --->
                         <input type="file" id="file-input" multiple accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.xlsx,.xls" hidden>
                         <p class="section-help-text">Sube archivos que quieras almacenar o procesar</p>
+                    
                     </div>
                     
-                    <h2 class="library-title">📚 Mi Biblioteca</h2>
                     
                     <div id="files-gallery" class="files-gallery">
                         <!-- Los archivos se cargarán aquí dinámicamente -->
@@ -261,7 +265,7 @@
     <div id="rag-analysis-modal" class="modal-overlay">
         <div class="rag-analysis-modal-container">
             <div class="rag-analysis-modal-header">
-                <h2>📊 Análisis de Similitud RAG</h2>
+                <h2>📊 Similitud con Biblio-Go</h2>
                 <button id="close-rag-analysis-modal" class="close-modal-btn">✕</button>
             </div>
             
@@ -271,7 +275,7 @@
         </div>
     </div>
     <!-- Scripts -->
-    <script src="shared.js"></script>
-    <script src="menu-script.js"></script>
+    <script src="/frontend/shared.js"></script>
+    <script src="/frontend/menu-script.js"></script>
 </body>
 </html>

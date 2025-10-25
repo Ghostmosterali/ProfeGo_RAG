@@ -469,6 +469,154 @@ async def list_files(
         logger.error(f"❌ Error listando archivos: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error listando archivos: {str(e)}")
 
+@app.get("/api/files/download/{category}/{filename}")
+async def download_file(
+    category: str,
+    filename: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Descargar archivo directamente desde GCS"""
+    user_email = current_user["email"]
+    
+    try:
+        es_procesado = category == "procesado"
+        
+        # Obtener el archivo desde GCS
+        contenido = gcs_storage.obtener_archivo_bytes(
+            email=user_email,
+            nombre_archivo=filename,
+            es_procesado=es_procesado
+        )
+        
+        if contenido is None:
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        
+        # Determinar el tipo MIME
+        content_type = "application/octet-stream"
+        ext = Path(filename).suffix.lower()
+        mime_types = {
+            '.pdf': 'application/pdf',
+            '.txt': 'text/plain',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.doc': 'application/msword',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.xls': 'application/vnd.ms-excel',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        }
+        content_type = mime_types.get(ext, content_type)
+        
+        # Retornar el archivo como stream
+        return StreamingResponse(
+            io.BytesIO(contenido),
+            media_type=content_type,
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=f"Error descargando archivo: {str(ex)}")
+
+@app.get("/api/files/preview/{category}/{filename}")
+async def preview_file(
+    category: str,
+    filename: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Vista previa de archivo - devuelve contenido según tipo"""
+    user_email = current_user["email"]
+    
+    try:
+        es_procesado = category == "procesado"
+        
+        # Obtener el archivo desde GCS
+        contenido = gcs_storage.obtener_archivo_bytes(
+            email=user_email,
+            nombre_archivo=filename,
+            es_procesado=es_procesado
+        )
+        
+        if contenido is None:
+            raise HTTPException(status_code=404, detail="Archivo no encontrado")
+        
+        # Detectar tipo de archivo
+        ext = Path(filename).suffix.lower()
+        
+        # Para PDFs e imágenes, devolver el archivo directamente
+        if ext in ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+            mime_types = {
+                '.pdf': 'application/pdf',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.bmp': 'image/bmp'
+            }
+            
+            return StreamingResponse(
+                io.BytesIO(contenido),
+                media_type=mime_types.get(ext, 'application/octet-stream'),
+                headers={"Content-Disposition": f"inline; filename={filename}"}
+            )
+        
+        # Para archivos TXT, devolver el contenido como JSON
+        elif ext == '.txt':
+            try:
+                texto = contenido.decode('utf-8')
+            except UnicodeDecodeError:
+                texto = contenido.decode('latin-1', errors='ignore')
+            
+            return JSONResponse(content={
+                "type": "text",
+                "content": texto,
+                "filename": filename
+            })
+        
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail="Tipo de archivo no soportado para vista previa"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as ex:
+        logger.error(f"Error en preview: {str(ex)}")
+        raise HTTPException(status_code=500, detail=f"Error: {str(ex)}")
+
+@app.delete("/api/files/delete/{category}/{filename}")
+@limiter.limit("20/minute")
+async def delete_file(
+    request: Request,
+    category: str,
+    filename: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Eliminar archivo de GCS"""
+    user_email = current_user["email"]
+    
+    try:
+        es_procesado = category == "procesado"
+        
+        resultado = gcs_storage.eliminar_archivo(
+            email=user_email,
+            nombre_archivo=filename,
+            es_procesado=es_procesado
+        )
+        
+        if not resultado['success']:
+            raise HTTPException(status_code=404, detail=resultado.get('error', 'Archivo no encontrado'))
+        
+        return {"message": f"Archivo '{filename}' eliminado correctamente"}
+        
+    except HTTPException:
+        raise
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=f"Error eliminando archivo: {str(ex)}")
 # ============================================================================
 # RUTAS PARA GENERACIÓN DE PLANES CON IA + RAG
 # ============================================================================
@@ -1036,7 +1184,7 @@ def generar_documento_word(plan_data: Dict) -> io.BytesIO:
     doc.add_page_break()
     
     # ========== MÓDULOS ==========
-    doc.add_heading('📚 Módulos del Plan', 1)
+    doc.add_heading('◈ Módulos del Plan', 1)
     
     modulos = plan_data.get('modulos', [])
     
@@ -1048,29 +1196,29 @@ def generar_documento_word(plan_data: Dict) -> io.BytesIO:
         # Información del módulo
         if modulo.get('campo_formativo'):
             p = doc.add_paragraph()
-            p.add_run('📘 Campo Formativo: ').bold = True
+            p.add_run('◇ Campo Formativo: ').bold = True
             p.add_run(modulo['campo_formativo'])
         
         if modulo.get('ejes_articuladores'):
             p = doc.add_paragraph()
-            p.add_run('🔗 Ejes Articuladores: ').bold = True
+            p.add_run('◇ Ejes Articuladores: ').bold = True
             p.add_run(', '.join(modulo['ejes_articuladores']))
         
         if modulo.get('aprendizaje_esperado'):
             p = doc.add_paragraph()
-            p.add_run('🎯 Aprendizaje Esperado: ').bold = True
+            p.add_run('◇ Aprendizaje Esperado: ').bold = True
             p.add_run(modulo['aprendizaje_esperado'])
         
         if modulo.get('tiempo_estimado'):
             p = doc.add_paragraph()
-            p.add_run('⏱️ Tiempo Estimado: ').bold = True
+            p.add_run('◇ Tiempo Estimado: ').bold = True
             p.add_run(modulo['tiempo_estimado'])
         
         doc.add_paragraph()
         
         # Actividad de inicio
         if modulo.get('actividad_inicio'):
-            doc.add_heading('🎬 Actividad de Inicio', 3)
+            doc.add_heading('◆ Actividad de Inicio', 3)
             inicio = modulo['actividad_inicio']
             
             p = doc.add_paragraph()
@@ -1099,7 +1247,7 @@ def generar_documento_word(plan_data: Dict) -> io.BytesIO:
         
         # Actividades de desarrollo
         if modulo.get('actividades_desarrollo'):
-            doc.add_heading('🚀 Actividades de Desarrollo', 3)
+            doc.add_heading('◆ Actividades de Desarrollo', 3)
             
             for act_idx, actividad in enumerate(modulo['actividades_desarrollo'], 1):
                 doc.add_heading(f"Actividad {act_idx}: {actividad.get('nombre', '')}", 4)
@@ -1149,7 +1297,7 @@ def generar_documento_word(plan_data: Dict) -> io.BytesIO:
         
         # Actividad de cierre
         if modulo.get('actividad_cierre'):
-            doc.add_heading('🎬 Actividad de Cierre', 3)
+            doc.add_heading('◆ Actividad de Cierre', 3)
             cierre = modulo['actividad_cierre']
             
             p = doc.add_paragraph()
@@ -1169,23 +1317,23 @@ def generar_documento_word(plan_data: Dict) -> io.BytesIO:
                 p = doc.add_paragraph()
                 p.add_run('Preguntas guía:').bold = True
                 for pregunta in cierre['preguntas_guia']:
-                    doc.add_paragraph(f"• {pregunta}", style='List Bullet')
+                    doc.add_paragraph(f" {pregunta}", style='List Bullet')
         
         # Información adicional del módulo
         if modulo.get('consejos_maestra'):
-            doc.add_heading('💡 Consejos para la Maestra', 3)
+            doc.add_heading('◇ Consejos para la Maestra', 3)
             doc.add_paragraph(modulo['consejos_maestra'])
         
         if modulo.get('variaciones'):
-            doc.add_heading('🔄 Variaciones', 3)
+            doc.add_heading('◇ Variaciones', 3)
             doc.add_paragraph(modulo['variaciones'])
         
         if modulo.get('vinculo_familia'):
-            doc.add_heading('🏠 Vínculo con la Familia', 3)
+            doc.add_heading('◇ Vínculo con la Familia', 3)
             doc.add_paragraph(modulo['vinculo_familia'])
         
         if modulo.get('evaluacion'):
-            doc.add_heading('📋 Evaluación', 3)
+            doc.add_heading('◇ Evaluación', 3)
             doc.add_paragraph(modulo['evaluacion'])
         
         # Separador entre módulos
@@ -1195,16 +1343,16 @@ def generar_documento_word(plan_data: Dict) -> io.BytesIO:
     # ========== RECURSOS EDUCATIVOS ==========
     if plan_data.get('recursos_educativos'):
         doc.add_page_break()
-        doc.add_heading('📚 Recursos Educativos', 1)
+        doc.add_heading('◈ Recursos Educativos', 1)
         recursos = plan_data['recursos_educativos']
         
         if recursos.get('materiales_generales'):
-            doc.add_heading('🛠️ Materiales Generales', 2)
+            doc.add_heading('◇ Materiales Generales', 2)
             for material in recursos['materiales_generales']:
-                doc.add_paragraph(f"• {material}", style='List Bullet')
+                doc.add_paragraph(f" {material}", style='List Bullet')
         
         if recursos.get('cuentos_recomendados'):
-            doc.add_heading('📖 Cuentos Recomendados', 2)
+            doc.add_heading('◇ Cuentos Recomendados', 2)
             for cuento in recursos['cuentos_recomendados']:
                 p = doc.add_paragraph()
                 p.add_run(f"• {cuento.get('titulo', '')}: ").bold = True
@@ -1225,7 +1373,7 @@ def generar_documento_word(plan_data: Dict) -> io.BytesIO:
                     doc.add_paragraph(f"  {cuento['descripcion_breve']}", style='List Bullet 2')
         
         if recursos.get('canciones_recomendadas'):
-            doc.add_heading('🎵 Canciones Recomendadas', 2)
+            doc.add_heading('◇ Canciones Recomendadas', 2)
             for cancion in recursos['canciones_recomendadas']:
                 p = doc.add_paragraph()
                 p.add_run(f"• {cancion.get('titulo', '')}: ").bold = True
@@ -1274,12 +1422,12 @@ def generar_documento_word(plan_data: Dict) -> io.BytesIO:
     
     # ========== RECOMENDACIONES DE AMBIENTE ==========
     if plan_data.get('recomendaciones_ambiente'):
-        doc.add_heading('🏫 Recomendaciones para el Ambiente', 2)
+        doc.add_heading('◇ Recomendaciones para el Ambiente', 2)
         doc.add_paragraph(plan_data['recomendaciones_ambiente'])
     
     # ========== VINCULACIÓN CURRICULAR ==========
     if plan_data.get('vinculacion_curricular'):
-        doc.add_heading('🔗 Vinculación Curricular', 2)
+        doc.add_heading('◇ Vinculación Curricular', 2)
         vinculacion = plan_data['vinculacion_curricular']
         
         if vinculacion.get('campo_formativo_principal'):
@@ -1300,7 +1448,7 @@ def generar_documento_word(plan_data: Dict) -> io.BytesIO:
         if vinculacion.get('aprendizajes_clave'):
             doc.add_heading('Aprendizajes Clave:', 3)
             for aprendizaje in vinculacion['aprendizajes_clave']:
-                doc.add_paragraph(f"• {aprendizaje}", style='List Bullet')
+                doc.add_paragraph(f" {aprendizaje}", style='List Bullet')
     
     # Guardar en memoria
     docx_bytes = io.BytesIO()

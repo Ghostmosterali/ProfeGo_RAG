@@ -68,3 +68,4 @@ setuptools>=65.0.0
 # ===================================
 pillow==11.0.0
 aiofiles==24.1.0
+sentence-transformers==3.3.1
