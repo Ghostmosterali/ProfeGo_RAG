@@ -64,11 +64,6 @@ langchain-core==0.3.63
 langchain-text-splitters==0.3.8
 
 # ===================================
-# VECTOR DATABASE (RAG SYSTEM)
-# ===================================
-chromadb==0.4.22
-
-# ===================================
 # SEGURIDAD Y AUTENTICACIÓN
 # ===================================
 python-jose[cryptography]==3.3.0
