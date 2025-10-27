@@ -4,44 +4,34 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 python-multipart==0.0.20
-starlette==0.38.6
 
 # ===================================
 # RATE LIMITING
 # ===================================
 slowapi==0.1.9
-limits==5.6.0
 
 # ===================================
 # FIREBASE (Autenticación)
 # ===================================
 Pyrebase4==4.8.0
-Pyrebase==3.0.27
 
 # ===================================
 # HTTP CLIENT
 # ===================================
 requests==2.32.3
 requests-toolbelt==0.10.1
-httpx==0.28.1
-httpcore==1.0.9
-aiohttp==3.13.1
 
 # ===================================
-# GOOGLE CLOUD & AI
+# GOOGLE CLOUD
 # ===================================
 google-cloud-storage==2.18.2
 google-auth==2.40.0
 google-api-core==2.25.0
-google-generativeai==0.8.3
-google-ai-generativelanguage==0.6.10
-google-api-python-client==2.184.0
-google-cloud-core==2.4.3
 
 # ===================================
 # PROCESAMIENTO OCR Y VISIÓN
 # ===================================
-opencv-python==4.10.0.84
+opencv-python-headless==4.10.0.84
 pytesseract==0.3.13
 
 # ===================================
@@ -72,19 +62,6 @@ langchain-chroma==0.1.4
 langchain-community==0.3.13
 langchain-core==0.3.63
 langchain-text-splitters==0.3.8
-langchain-google-genai==2.0.5
-langsmith==0.1.129
-
-# ===================================
-# MACHINE LEARNING & EMBEDDINGS
-# ===================================
-sentence-transformers==3.3.1
-torch==2.9.0
-transformers==4.x  # Ajustar según tokenizers
-tokenizers==0.20.3
-huggingface-hub==0.35.3
-scikit-learn==1.7.2
-scipy==1.16.2
 
 # ===================================
 # SEGURIDAD Y AUTENTICACIÓN
@@ -92,50 +69,22 @@ scipy==1.16.2
 python-jose[cryptography]==3.3.0
 cryptography==43.0.3
 pycryptodome==3.23.0
-bcrypt==5.0.0
-PyNaCl==1.6.0
 
 # ===================================
-# INTERFAZ DE USUARIO (FLET)
-# ===================================
-flet==0.28.3
-flet-desktop==0.28.3
-flet-web==0.28.3
-
-# ===================================
-# UTILIDADES GENERALES
+# UTILIDADES
 # ===================================
 python-dotenv==1.1.1
 python-dateutil==2.9.0.post0
 pydantic==2.11.9
 pydantic-settings==2.11.0
-pydantic-core==2.33.2
-setuptools>=80.9.0
-click==8.3.0
-rich==14.2.0
-tqdm==4.67.1
+setuptools>=65.0.0
 
 # ===================================
 # DEPENDENCIAS ADICIONALES
 # ===================================
 pillow==11.0.0
 aiofiles==24.1.0
-tiktoken==0.8.0
-pyperclip==1.11.0
-
-# ===================================
-# TELEMETRÍA Y MONITOREO
-# ===================================
-opentelemetry-api==1.38.0
-opentelemetry-sdk==1.38.0
-opentelemetry-instrumentation-fastapi==0.59b0
-posthog==6.7.8
-
-# ===================================
-# BASE DE DATOS
-# ===================================
-SQLAlchemy==2.0.44
-
+sentence-transformers==3.3.1
 # ===================================
 # UTILIDADES DE DESARROLLO
 # ===================================
