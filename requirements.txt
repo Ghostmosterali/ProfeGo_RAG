@@ -20,6 +20,7 @@ Pyrebase4==4.8.0
 # ===================================
 requests==2.32.3
 requests-toolbelt==0.10.1
+httpx==0.28.1
 
 # ===================================
 # GOOGLE CLOUD & AI
@@ -63,6 +64,16 @@ langchain-chroma==0.1.4
 langchain-community==0.3.13
 langchain-core==0.3.63
 langchain-text-splitters==0.3.8
+langchain-google-genai==2.0.5
+
+# ===================================
+# MACHINE LEARNING
+# ===================================
+sentence-transformers==3.3.1
+torch==2.9.0
+transformers==4.46.3
+tiktoken==0.8.0
+onnxruntime==1.23.1
 
 # ===================================
 # SEGURIDAD Y AUTENTICACIÓN
@@ -79,14 +90,10 @@ python-dateutil==2.9.0.post0
 pydantic==2.11.9
 pydantic-settings==2.11.0
 setuptools>=65.0.0
+json_repair==0.25.0
 
 # ===================================
 # DEPENDENCIAS ADICIONALES
 # ===================================
 pillow==11.0.0
 aiofiles==24.1.0
-sentence-transformers==3.3.1
-# ===================================
-# UTILIDADES DE DESARROLLO
-# ===================================
-invoke==2.2.0
