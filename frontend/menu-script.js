@@ -62,8 +62,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    userInfo.textContent = `👋 Hola, ${currentUser}`;
-    
+    userInfo.textContent = `👋 Hola, Docente`;
+    /** ${currentUser} */
     switchToSection('inicio');
     setupEventListeners();
     loadPlanes();
@@ -670,7 +670,7 @@ async function showPlanDetail(planId) {
                     
                     ${modulo.consejos_maestra ? `
                         <div class="module-section">
-                            <h4>💡 Consejos para la Maestra</h4>
+                            <h4>💡 Consejos para el Docente</h4>
                             <p>${escapeHtml(modulo.consejos_maestra)}</p>
                         </div>
                     ` : ''}
@@ -1207,7 +1207,7 @@ async function showRAGAnalysis(planId) {
     const content = document.getElementById('rag-analysis-content');
     
     try {
-        showLoading('Analizando similitud semántica con RAG...');
+        showLoading('Analizando similitud semántica con Biblio-Go...');
         
         const response = await apiRequest(`/plans/${planId}/rag-analysis`);
         
@@ -1349,21 +1349,21 @@ function displayRAGAnalysis(data) {
                     <div class="metric-icon">📚</div>
                     <div class="metric-info">
                         <div class="metric-value">${metricas.total_recursos_rag || 0}</div>
-                        <div class="metric-label">Recursos RAG Recuperados</div>
+                        <div class="metric-label">Recursos Biblioteca Profe-Go recuperados</div>
                     </div>
                 </div>
                 <div class="metric-card">
                     <div class="metric-icon">✅</div>
                     <div class="metric-info">
                         <div class="metric-value">${metricas.recursos_utilizados || 0}</div>
-                        <div class="metric-label">Recursos Utilizados</div>
+                        <div class="metric-label">Recursos Utilizados en la planeacion</div>
                     </div>
                 </div>
                 <div class="metric-card highlight">
                     <div class="metric-icon">📊</div>
                     <div class="metric-info">
                         <div class="metric-value">${metricas.porcentaje_uso_rag || 0}%</div>
-                        <div class="metric-label">Uso de RAG en el Plan</div>
+                        <div class="metric-label">Uso de Biblio-Go en el Plan</div>
                     </div>
                 </div>
                 <div class="metric-card">
@@ -1377,7 +1377,7 @@ function displayRAGAnalysis(data) {
         </div>
         
         <div class="rag-analysis-chart">
-            <h3>📊 Distribución de Uso de RAG</h3>
+            <h3>📊 Uso de Biblioteca Profe-Go</h3>
             <div class="chart-container">
                 <div class="donut-chart">
                     <svg viewBox="0 0 100 100">
@@ -1393,11 +1393,11 @@ function displayRAGAnalysis(data) {
                 <div class="chart-legend">
                     <div class="legend-item">
                         <span class="legend-color" style="background: #4CAF50;"></span>
-                        <span>Recursos de RAG</span>
+                        <span>Recursos de Biblioteca</span>
                     </div>
                     <div class="legend-item">
                         <span class="legend-color" style="background: #e0e0e0;"></span>
-                        <span>Otros recursos</span>
+                        <span>Recursos Externos</span>
                     </div>
                 </div>
             </div>
@@ -1408,8 +1408,8 @@ function displayRAGAnalysis(data) {
     if (analisis.recursos_altamente_relevantes && analisis.recursos_altamente_relevantes.length > 0) {
     html += `
         <div class="rag-recursos-section">
-            <h3>🎯 Recursos Relevantes (Similitud ≥ 48%)</h3>
-            // ↑ NUEVO TEXTO
+            <h3>🎯 Recursos Relevantes (Similitud ≥ 50%)</h3>
+        
             <p class="section-description">
                 Estos recursos de la biblioteca tienen al menos 50% de similitud semántica con tu plan.
                 Son suficientemente relevantes para integrarlos en las actividades.
@@ -1452,7 +1452,7 @@ function displayRAGAnalysis(data) {
                         <div class="content-preview-text">${escapeHtml(recurso.fragmento || 'Sin preview')}</div>
                         ${recurso.contenido_completo ? `
                             <button class="btn-expand" onclick="toggleFullContent(this, '${escapeHtml(recurso.contenido_completo).replace(/'/g, "\\'")}')">
-                                Ver contenido completo ▼
+                            
                             </button>
                             <div class="content-full hidden"></div>
                         ` : ''}
@@ -1460,13 +1460,11 @@ function displayRAGAnalysis(data) {
                     
                     ${recurso.markdown_formato ? `
                         <div class="recurso-markdown-section">
-                            <h5>📋 Formato Markdown para Integración:</h5>
+                            <h5>📋 Recurso Interno:</h5>
                             <div class="markdown-preview">
                                 <pre>${escapeHtml(recurso.markdown_formato)}</pre>
                             </div>
-                            <button class="btn btn-secondary btn-sm" onclick="copyToClipboard('${escapeHtml(recurso.markdown_formato).replace(/'/g, "\\'")}')">
-                                📋 Copiar Markdown
-                            </button>
+                            
                         </div>
                     ` : ''}
                 </div>
@@ -1543,15 +1541,15 @@ function displayRAGAnalysis(data) {
     if (porcentaje >= 70) {
         html += `
             <div class="alert alert-success">
-                <strong>✅ Excelente uso de RAG</strong>
-                <p>El ${porcentaje}% del plan utiliza recursos verificados de la biblioteca digital. 
+                <strong>✅ Excelente uso de la Biblioteca Profe-Go</strong>
+                <p>Este plan utiliza el ${porcentaje}% de los recursos verificados de la biblioteca digital. 
                 Esto garantiza que las actividades están basadas en materiales reales y disponibles.</p>
             </div>
         `;
     } else if (porcentaje >= 40) {
         html += `
             <div class="alert alert-info">
-                <strong>ℹ️ Buen uso de RAG</strong>
+                <strong>ℹ️ Buen uso de la Biblioteca Profe-Go</strong>
                 <p>El ${porcentaje}% del plan integra recursos de la biblioteca. 
                 Se complementa con recursos adicionales sugeridos por la IA.</p>
             </div>
@@ -1559,7 +1557,7 @@ function displayRAGAnalysis(data) {
     } else {
         html += `
             <div class="alert alert-warning">
-                <strong>⚠️ Uso limitado de RAG</strong>
+                <strong>⚠️ Uso limitado de la Biblioteca Profe-Go</strong>
                 <p>Solo el ${porcentaje}% del plan usa recursos de la biblioteca. 
                 Considera agregar más cuentos y canciones a la biblioteca para mejorar futuras generaciones.</p>
             </div>

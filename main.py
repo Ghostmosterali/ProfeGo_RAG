@@ -1321,7 +1321,7 @@ def generar_documento_word(plan_data: Dict) -> io.BytesIO:
         
         # Información adicional del módulo
         if modulo.get('consejos_maestra'):
-            doc.add_heading('◇ Consejos para la Maestra', 3)
+            doc.add_heading('◇ Consejos para el Docente', 3)
             doc.add_paragraph(modulo['consejos_maestra'])
         
         if modulo.get('variaciones'):
@@ -1519,7 +1519,7 @@ class RAGAnalyzer:
         self,
         plan_data: Dict,
         retrieved_docs: Dict,
-        threshold: float = 0.50
+        threshold: float = 0.65
     ) -> Dict:
         """
         Analiza la similitud entre el plan generado y los recursos RAG
@@ -1577,7 +1577,7 @@ class RAGAnalyzer:
                     usado = True
                     break
             
-            if usado or similitud >= 0.50:
+            if usado or similitud >= 0.65:
                 recurso_info = self._format_recurso(cuento, 'cuento', similitud)
                 recursos_encontrados.append(recurso_info)
                 if usado:
@@ -1590,10 +1590,10 @@ class RAGAnalyzer:
             similitud = cancion.get('similarity', 0)
             
             usado = False
-            keywords = clean_name.split()[:3]
+            keywords = clean_name.split()[:4]
             
             for keyword in keywords:
-                if len(keyword) > 3 and keyword in plan_text_lower:
+                if len(keyword) > 4 and keyword in plan_text_lower:
                     usado = True
                     break
             
@@ -1606,7 +1606,7 @@ class RAGAnalyzer:
                     usado = True
                     break
             
-            if usado or similitud >= 0.50:
+            if usado or similitud >= 0.65:
                 recurso_info = self._format_recurso(cancion, 'cancion', similitud)
                 recursos_encontrados.append(recurso_info)
                 if usado:
@@ -1646,7 +1646,7 @@ class RAGAnalyzer:
                         analisis['metricas_rag']['actividades_biblioteca_usadas'] += 1
                         break
             
-            if usado or similitud >= 0.50:
+            if usado or similitud >= 0.65:
                 recurso_info = self._format_recurso(actividad, 'actividad', similitud)
                 recursos_encontrados.append(recurso_info)
                 if usado:
