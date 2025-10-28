@@ -4,6 +4,7 @@ Base de datos vectorial usando ChromaDB para el sistema RAG
 
 import chromadb
 from chromadb.config import Settings
+from chromadb.utils import embedding_functions
 from typing import List, Dict, Optional
 import logging
 import os
@@ -34,6 +35,11 @@ class VectorStore:
         # Crear directorio si no existe
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
         
+        # Configurar función de embedding
+        self.embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2"
+        )
+        
         # Inicializar cliente ChromaDB
         self.client = chromadb.PersistentClient(
             path=persist_directory,
@@ -45,11 +51,15 @@ class VectorStore:
         
         # Obtener o crear colección
         try:
-            self.collection = self.client.get_collection(name=collection_name)
+            self.collection = self.client.get_collection(
+                name=collection_name,
+                embedding_function=self.embedding_function
+            )
             logger.info(f"✅ Colección '{collection_name}' cargada")
         except:
             self.collection = self.client.create_collection(
                 name=collection_name,
+                embedding_function=self.embedding_function,
                 metadata={"hnsw:space": "cosine"}
             )
             logger.info(f"✅ Colección '{collection_name}' creada")
@@ -207,6 +217,7 @@ class VectorStore:
             self.client.delete_collection(name=self.collection_name)
             self.collection = self.client.create_collection(
                 name=self.collection_name,
+                embedding_function=self.embedding_function,
                 metadata={"hnsw:space": "cosine"}
             )
             logger.info(f"🔄 Colección '{self.collection_name}' reiniciada")
