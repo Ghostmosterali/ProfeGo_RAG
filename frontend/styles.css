@@ -968,7 +968,7 @@ body {
 .generate-plan-section {
     text-align: center;
     padding: 30px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     border-radius: 12px;
     margin-bottom: 30px;
     box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
@@ -976,7 +976,7 @@ body {
 
 .btn-generate-plan {
     background: white;
-    color: #667eea;
+    color: var(--primary-color);
     font-size: 18px;
     font-weight: bold;
     padding: 15px 40px;
@@ -1035,7 +1035,7 @@ body {
 
 .generate-plan-modal-header {
     padding: 20px 30px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
     display: flex;
     justify-content: space-between;
@@ -1228,8 +1228,8 @@ body {
 }
 
 .plan-card-consulta:hover {
-    border-color: #667eea;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+    border-color: #4CAF50;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
     transform: translateY(-2px);
 }
 
@@ -1276,7 +1276,7 @@ body {
 .plan-card-badge {
     display: inline-block;
     padding: 4px 12px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
     border-radius: 12px;
     font-size: 12px;
@@ -1363,7 +1363,7 @@ body {
 
 .plan-detail-modal-header {
     padding: 20px 30px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
     display: flex;
     justify-content: space-between;
@@ -1398,7 +1398,7 @@ body {
 
 .detail-badge {
     padding: 6px 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
     border-radius: 16px;
     font-size: 13px;
@@ -1437,8 +1437,8 @@ body {
 }
 
 .module-card:hover {
-    border-color: #667eea;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.1);
+    border-color: #4CAF50;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.1);
 }
 
 .module-header {
@@ -1456,7 +1456,7 @@ body {
 }
 
 .module-number {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
     padding: 8px 16px;
     border-radius: 8px;
@@ -1475,7 +1475,7 @@ body {
 
 .module-arrow {
     font-size: 20px;
-    color: #667eea;
+    color: #4CAF50;
     transition: transform 0.3s ease;
 }
 
@@ -1504,7 +1504,7 @@ body {
     margin: 0 0 10px 0;
     font-size: 15px;
     font-weight: 600;
-    color: #667eea;
+    color: #4CAF50;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -1703,7 +1703,7 @@ body {
     margin: 0 0 15px 0;
     font-size: 16px;
     font-weight: 600;
-    color: #667eea;
+    color: #4CAF50;
 }
 
 .ejes-list {
@@ -1714,7 +1714,7 @@ body {
 
 .eje-badge {
     padding: 8px 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
     border-radius: 20px;
     font-size: 13px;
@@ -1739,7 +1739,7 @@ body {
 
 .actividad-section {
     background: #f8f9fa;
-    border-left: 4px solid #667eea;
+    border-left: 4px solid #4CAF50;
 }
 
 .actividad-card {
@@ -1754,7 +1754,7 @@ body {
     margin: 0 0 10px 0;
     font-size: 15px;
     font-weight: 600;
-    color: #667eea;
+    color: #4CAF50;
 }
 
 .actividad-card p {
@@ -1799,7 +1799,7 @@ body {
     margin: 0 0 25px 0;
     font-size: 22px;
     font-weight: bold;
-    color: #667eea;
+    color: #4CAF50;
 }
 
 .recurso-subsection {
@@ -1985,7 +1985,7 @@ body {
     margin: 0 0 15px 0;
     font-size: 16px;
     font-weight: 600;
-    color: #667eea;
+    color: #4CAF50;
 }
 
 .ejes-list {
@@ -1996,7 +1996,7 @@ body {
 
 .eje-badge {
     padding: 8px 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
     border-radius: 20px;
     font-size: 13px;
@@ -2021,7 +2021,7 @@ body {
 
 .actividad-section {
     background: #f8f9fa;
-    border-left: 4px solid #667eea;
+    border-left: 4px solid #4CAF50;
 }
 
 .actividad-card {
@@ -2036,7 +2036,7 @@ body {
     margin: 0 0 10px 0;
     font-size: 15px;
     font-weight: 600;
-    color: #667eea;
+    color: #4CAF50;
 }
 
 .actividad-card p {
@@ -2081,7 +2081,7 @@ body {
     margin: 0 0 25px 0;
     font-size: 22px;
     font-weight: bold;
-    color: #667eea;
+    color: #4CAF50;
 }
 
 .recurso-subsection {
@@ -2449,7 +2449,7 @@ body {
 
 .rag-analysis-modal-header {
     padding: 25px 30px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
     display: flex;
     justify-content: space-between;
@@ -2482,7 +2482,7 @@ body {
 
 .rag-analysis-summary h3 {
     margin: 0 0 20px 0;
-    color: #667eea;
+    color: #4CAF50;
     font-size: 20px;
 }
 
@@ -2508,7 +2508,7 @@ body {
 }
 
 .metric-card.highlight {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
 }
 
@@ -2519,7 +2519,7 @@ body {
 .metric-value {
     font-size: 32px;
     font-weight: bold;
-    color: #667eea;
+    color: #4CAF50;
     line-height: 1;
     margin-bottom: 5px;
 }
@@ -2549,7 +2549,7 @@ body {
 
 .rag-analysis-chart h3 {
     margin: 0 0 20px 0;
-    color: #667eea;
+    color: #4CAF50;
     font-size: 20px;
 }
 
@@ -2596,7 +2596,7 @@ body {
 
 .rag-recursos-section h3 {
     margin: 0 0 10px 0;
-    color: #667eea;
+    color: #4CAF50;
     font-size: 20px;
 }
 
@@ -2741,7 +2741,7 @@ body {
 .recurso-content-preview h5 {
     margin: 0 0 10px 0;
     font-size: 14px;
-    color: #667eea;
+    color: #4CAF50;
 }
 
 .content-preview-text {
@@ -2751,14 +2751,14 @@ body {
     font-size: 14px;
     line-height: 1.6;
     color: #333;
-    border-left: 3px solid #667eea;
+    border-left: 3px solid #4CAF50;
     margin-bottom: 10px;
 }
 
 .btn-expand {
     background: none;
     border: none;
-    color: #667eea;
+    color: #4CAF50;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -2767,7 +2767,7 @@ body {
 }
 
 .btn-expand:hover {
-    color: #764ba2;
+    color: rgba(76, 175, 80, 0.1);
 }
 
 .content-full {
@@ -2792,13 +2792,13 @@ body {
     background: #f0f4ff;
     padding: 20px;
     border-radius: 8px;
-    border: 2px dashed #667eea;
+    border: 2px dashed #4CAF50;
 }
 
 .recurso-markdown-section h5 {
     margin: 0 0 10px 0;
     font-size: 14px;
-    color: #667eea;
+    color: #4CAF50;
 }
 
 .markdown-preview {
@@ -2826,7 +2826,7 @@ body {
 
 .rag-modulos-section h3 {
     margin: 0 0 10px 0;
-    color: #667eea;
+    color: #4CAF50;
     font-size: 20px;
 }
 
@@ -2836,7 +2836,7 @@ body {
     padding: 20px;
     margin-bottom: 15px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-    border-left: 4px solid #667eea;
+    border-left: 4px solid #4CAF50;
 }
 
 .modulo-rag-header {
@@ -2847,7 +2847,7 @@ body {
 }
 
 .modulo-number {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
     padding: 8px 16px;
     border-radius: 20px;
@@ -2912,7 +2912,7 @@ body {
 
 .rag-interpretation h3 {
     margin: 0 0 20px 0;
-    color: #667eea;
+    color: #4CAF50;
     font-size: 20px;
 }
 
@@ -2955,12 +2955,12 @@ body {
 
 /* Botón de acción RAG en tarjeta de plan */
 .btn-rag-analysis {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
     color: white;
 }
 
 .btn-rag-analysis:hover {
-    background: linear-gradient(135deg, #5568d3 0%, #6a4190 100%);
+    background: linear-gradient(135deg, #4CAF50 0%, #6f826a 100%);
 }
 
 /* Scrollbar personalizada para el contenido */
@@ -2974,12 +2974,12 @@ body {
 }
 
 .rag-analysis-modal-content::-webkit-scrollbar-thumb {
-    background: #667eea;
+    background: #4CAF50;
     border-radius: 10px;
 }
 
 .rag-analysis-modal-content::-webkit-scrollbar-thumb:hover {
-    background: #5568d3;
+    background: #388e3c;
 }
 
 /* Responsive */
