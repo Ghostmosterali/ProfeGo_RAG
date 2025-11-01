@@ -375,7 +375,7 @@ async function processPlan() {
         
         if (result.success) {
             showMessage(
-                `Plan generado exitosamente: "${result.plan_data.nombre_plan}"`,
+                `Planeacion generada exitosamente: "${result.plan_data.nombre_plan}"`,
                 'success'
             );
             
