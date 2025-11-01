@@ -31,7 +31,7 @@
             <div id="inicio-content" class="content-section active">
                 <div class="welcome-container">
                     <h2>¡Bienvenido a ProfeGo!</h2>
-                    <p class="welcome-subtitle">Tu plataforma personal para gestionar archivos y generar planes de estudio personalizados</p>
+                    <p class="welcome-subtitle">Tu plataforma personal para gestionar archivos y generar planeaciones de estudio personalizados</p>
                     
                     <div class="features-grid">
                         <div class="feature-card">
@@ -42,11 +42,11 @@
                         <div class="feature-card">
                             <div class="feature-icon">🤖</div>
                             <h3>IA Generativa</h3>
-                            <p>Genera planes personalizados con Gemini AI</p>
+                            <p>Genera planeaciones personalizadas con Gemini AI</p>
                         </div>
                         <div class="feature-card">
                             <div class="feature-icon">📊</div>
-                            <h3>Planes estructurados</h3>
+                            <h3>Planeaciones bien estructurados</h3>
                             <p>Módulos organizados y listos para usar</p>
                         </div>
                     </div>
@@ -61,9 +61,9 @@
 
                     <div class="generate-plan-section">
                         <button id="generate-plan-btn" class="btn btn-generate-plan">
-                            ➕ AÑADIR PLAN
+                            ➕ GENERAR PLANEACION
                         </button>
-                        <p class="section-help-text">Sube tu plan de estudios y diagnóstico para generar módulos personalizados</p>
+                        <p class="section-help-text">Sube tu planeacion de estudios y diagnóstico para generar módulos personalizados</p>
                     </div>
 
                     <div class="divider"></div>
@@ -84,7 +84,7 @@
                 </div>
             </div>
 
-            <!-- Sección Consulta (antes "Plan de Estudio") -->
+            <!-- Sección Consulta (antes "Planeacion de Estudio") -->
             <div id="consulta-content" class="content-section hidden">
                 <div class="consulta-container">
                     <div class="consulta-header">
@@ -100,7 +100,7 @@
                             <div class="empty-state">
                                 <div class="empty-icon">📝</div>
                                 <h3>No hay planes generados aún</h3>
-                                <p>Ve a la sección ARCHIVOS y presiona "AÑADIR PLAN" para comenzar</p>
+                                <p>Ve a la sección ARCHIVOS y presiona "GENERAR PLANEACION" para comenzar</p>
                             </div>
                         </div>
                     </div>
@@ -120,7 +120,7 @@
                     <ul class="features-list">
                         <li>• Almacenamiento seguro en la nube</li>
                         <li>• Procesamiento automático con OCR</li>
-                        <li>• Generación de planes con Gemini AI</li>
+                        <li>• Generación de planes con Gemini AI y RAG</li>
                         <li>• Personalización según diagnóstico del grupo</li>
                         <li>• Vista previa de archivos</li>
                         <li>• Sincronización automática</li>
@@ -182,7 +182,7 @@
     <div id="generate-plan-modal" class="modal-overlay">
         <div class="generate-plan-modal-container">
             <div class="generate-plan-modal-header">
-                <h2>➕ Generar Plan de Estudio</h2>
+                <h2>➕ Generar Planeacion de Estudio</h2>
                 <button id="close-generate-plan-modal" class="close-modal-btn">✕</button>
             </div>
             
@@ -192,7 +192,7 @@
                     <div class="file-upload-row">
                         <div class="file-upload-label">
                             <span class="required-indicator">*</span>
-                            <label>📚 Plan de Estudios</label>
+                            <label>📚 Planeaciones de Estudios</label>
                             <p class="help-text">Sube tus planeaciones (PDF, Word, etc.)</p>
                         </div>
                         <div class="file-upload-input">
@@ -228,7 +228,7 @@
                         <ul>
                             <li>El plan de estudios es <strong>obligatorio</strong></li>
                             <li>El diagnóstico es <strong>opcional</strong> pero recomendado para personalizar</li>
-                            <li>Tamaño máximo por archivo: <strong>80MB</strong></li>
+                            <li>Tamaño máximo por archivo: <strong>15MB</strong></li>
                             <li>Formatos soportados: PDF, Word, imágenes, texto</li>
                             <li>El procesamiento puede tardar <strong>1-3 minutos</strong></li>
                         </ul>
