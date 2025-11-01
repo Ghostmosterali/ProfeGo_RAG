@@ -266,7 +266,7 @@ profego/
 
 ## 📧 Soporte
 
-Email: soporteprofego@gmail.com
+Email: profego.soporte@gmail.com
 
 ---
 
