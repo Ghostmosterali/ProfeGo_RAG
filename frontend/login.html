@@ -19,8 +19,30 @@
                     </div>
                     <div class="input-group">
                         <input type="password" id="password" placeholder="Contraseña" required>
+                        <!-- AGREGAR ESTE DIV ↓ -->
+                        <div id="password-requirements" class="password-requirements hidden">
+                            <div class="requirement" id="req-length">
+                                <span class="req-icon">○</span>
+                                <span class="req-text">Mínimo 8 caracteres</span>
+                            </div>
+                            <div class="requirement" id="req-uppercase">
+                                <span class="req-icon">○</span>
+                                <span class="req-text">Una letra mayúscula</span>
+                            </div>
+                            <div class="requirement" id="req-lowercase">
+                                <span class="req-icon">○</span>
+                                <span class="req-text">Una letra minúscula</span>
+                            </div>
+                            <div class="requirement" id="req-number">
+                                <span class="req-icon">○</span>
+                                <span class="req-text">Un número</span>
+                            </div>
+                            <div class="requirement" id="req-special">
+                                <span class="req-icon">○</span>
+                                <span class="req-text">Un carácter especial (!@#$%...)</span>
+                            </div>
+                        </div>
                     </div>
-
                     <div class="button-group">
                         <button type="submit" id="login-btn" class="btn btn-primary">Ingresar</button>
                         <button type="button" id="register-btn" class="btn btn-secondary">Registrar</button>
