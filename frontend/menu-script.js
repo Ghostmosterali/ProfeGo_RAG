@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    userInfo.textContent = `👋 Hola, Docente`;
+    userInfo.textContent = `👋 Bienvenido/a`;
     /** ${currentUser} */
     switchToSection('inicio');
     setupEventListeners();
