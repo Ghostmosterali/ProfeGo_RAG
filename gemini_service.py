@@ -173,7 +173,7 @@ IMPORTANTE SOBRE EL FORMATO JSON:
   "duracion_total": "Tiempo total estimado del plan (ej: 4 semanas)",
   "campo_formativo_principal": "Campo formativo dominante del plan completo",
   "ejes_articuladores_generales": ["Lista de ejes que atraviesan todo el plan"],
-  "num_modulos": 6,
+  "num_modulos": 4-8,
   
   "modulos": [
     {{
@@ -285,7 +285,7 @@ IMPORTANTE SOBRE EL FORMATO JSON:
 - NO incluyas explicaciones adicionales, solo el JSON
 - NO uses markdown (```json), solo el objeto JSON puro
 - Asegúrate de que el JSON sea válido y esté bien formado
-- Genera entre 5 y 7 módulos (uno por semana aprox.)
+- Genera entre 5 y 8 módulos (uno por semana aprox.)
 - {context_emphasis}
 - Cada módulo debe tener al menos 3-5 actividades de desarrollo variadas
 - El lenguaje debe ser cálido, cercano y motivador
