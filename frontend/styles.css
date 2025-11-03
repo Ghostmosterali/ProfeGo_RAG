@@ -3113,3 +3113,57 @@ body {
     max-height: 200px;
     overflow-y: auto;
 }
+
+/* ===== VALIDACIÓN DE CONTRASEÑA ===== */
+.password-requirements {
+    margin-top: 10px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 13px;
+    transition: all 0.3s ease;
+}
+
+.password-requirements.hidden {
+    display: none;
+}
+
+.requirement {
+    display: flex;
+    align-items: center;
+    margin: 6px 0;
+    color: #999;
+    transition: color 0.3s ease;
+}
+
+.requirement.valid {
+    color: #4caf50;
+}
+
+.requirement.invalid {
+    color: #f44336;
+}
+
+.req-icon {
+    margin-right: 8px;
+    font-weight: bold;
+    font-size: 16px;
+    transition: all 0.3s ease;
+}
+
+.requirement.valid .req-icon {
+    content: '✓';
+}
+
+.requirement.valid .req-icon::before {
+    content: '✓';
+}
+
+.requirement.invalid .req-icon::before {
+    content: '✗';
+}
+
+.req-text {
+    font-size: 12px;
+}
