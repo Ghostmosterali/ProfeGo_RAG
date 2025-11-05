@@ -14,6 +14,7 @@ slowapi==0.1.9
 # FIREBASE (Autenticación)
 # ===================================
 Pyrebase4==4.8.0
+firebase-admin==6.5.0
 
 # ===================================
 # HTTP CLIENT
@@ -91,6 +92,7 @@ pydantic==2.11.9
 pydantic-settings==2.11.0
 setuptools>=65.0.0
 json_repair==0.25.0
+tenacity==9.0.0
 
 # ===================================
 # DEPENDENCIAS ADICIONALES
