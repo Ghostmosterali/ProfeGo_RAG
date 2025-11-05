@@ -333,14 +333,14 @@ async function processPlan() {
         }
         
         // Validar tamaños
-        const maxSize = 10 * 1024 * 1024; // 10MB
+        const maxSize = 15 * 1024 * 1024; // 15MB
         if (planFile.size > maxSize) {
-            showMessage('El plan de estudios excede el tamaño máximo de 10MB', 'error');
+            showMessage('El plan de estudios excede el tamaño máximo de 15MB', 'error');
             return;
         }
         
         if (diagnosticoFile && diagnosticoFile.size > maxSize) {
-            showMessage('El diagnóstico excede el tamaño máximo de 10MB', 'error');
+            showMessage('El diagnóstico excede el tamaño máximo de 15MB', 'error');
             return;
         }
         

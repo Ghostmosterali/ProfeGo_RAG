@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verificado - ProfeGo</title>
+    <link rel="stylesheet" href="/frontend/styles.css">
+</head>
+<body>
+    <div class="section-active">
+        <div class="login-container">
+            <div class="login-card">
+                <h1 class="app-title">✅ ProfeGo</h1>
+                <p class="app-subtitle">¡Email verificado correctamente!</p>
+
+                <div style="text-align: center; padding: 40px 20px;">
+                    <div style="font-size: 80px; margin-bottom: 20px;">🎉</div>
+                    
+                    <h2 style="color: #4CAF50; margin-bottom: 20px;">¡Tu cuenta ha sido verificada!</h2>
+                    
+                    <p style="color: #666; line-height: 1.6; margin-bottom: 30px;">
+                        Tu dirección de correo electrónico ha sido confirmada exitosamente.
+                        Ya puedes acceder a todas las funcionalidades de ProfeGo.
+                    </p>
+
+                    <a href="/login.html" class="btn btn-primary" style="display: inline-block; text-decoration: none;">
+                        Ir al inicio de sesión
+                    </a>
+                </div>
+
+                <div class="footer-content">
+                    <p>&copy; 2025 ProfeGo. Todos los derechos reservados.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Redirigir automáticamente después de 5 segundos
+        setTimeout(() => {
+            window.location.href = '/login.html';
+        }, 5000);
+    </script>
+</body>
+</html>
