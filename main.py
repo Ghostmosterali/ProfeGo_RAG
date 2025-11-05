@@ -57,7 +57,7 @@ load_dotenv()
 
 firebase_creds_json = os.getenv("FIREBASE_ADMIN_CREDENTIALS_JSON")
 if firebase_creds_json:
-    cred = credentials.Certificate(json.loads(firebase_creds_json))
+    cred = credentials.Certificate(firebase_creds_json)
     firebase_admin.initialize_app(cred)
 else:
     logger.error("❌ FIREBASE_ADMIN_CREDENTIALS_JSON no configurada")
@@ -491,36 +491,74 @@ async def request_password_reset(request: Request, reset_request: PasswordResetR
 
 @app.post("/api/auth/reset-password")
 @limiter.limit("5/minute")
-async def reset_password(request: Request, token: str, new_password: str):
+async def reset_password(request: Request, reset_data: PasswordReset):
+    """
+    Restablece la contraseña del usuario usando Firebase Admin SDK
+    """
+    logger.info(f"🔑 Procesando reset de contraseña...")
+    
     try:
-        # Verificar el token
-        if token not in verification_tokens:
-            raise HTTPException(status_code=400, detail="Token inválido o expirado")
+        # 1. Verificar el token personalizado
+        email = verify_token(reset_data.token, 'reset_password')
         
-        email = verification_tokens[token]
+        if not email:
+            raise HTTPException(
+                status_code=400,
+                detail="Token inválido o expirado. Solicita un nuevo enlace de restablecimiento."
+            )
         
-        # Buscar el usuario por email
-        user = auth.get_user_by_email(email)
+        logger.info(f"✅ Token válido para: {email}")
         
-        # Cambiar la contraseña directamente con Admin SDK
-        auth.update_user(
-            user.uid,
-            password=new_password
-        )
+        # 2. Validar la nueva contraseña
+        if not ProfeGoUtils.validar_password(reset_data.new_password):
+            raise HTTPException(
+                status_code=400,
+                detail="La contraseña debe tener al menos 6 caracteres"
+            )
         
-        # Eliminar el token usado
-        del verification_tokens[token]
+        # 3. Obtener el usuario por email usando Firebase Admin SDK
+        try:
+            from firebase_admin import auth as admin_auth
+            user = admin_auth.get_user_by_email(email)
+            logger.info(f"✅ Usuario encontrado: {user.uid}")
+        except Exception as e:
+            logger.error(f"❌ Usuario no encontrado: {e}")
+            raise HTTPException(
+                status_code=404,
+                detail="Usuario no encontrado en el sistema"
+            )
         
-        logger.info(f"✅ Contraseña cambiada exitosamente para: {email}")
+        # 4. Actualizar la contraseña usando Admin SDK
+        try:
+            admin_auth.update_user(
+                user.uid,
+                password=reset_data.new_password
+            )
+            logger.info(f"✅ Contraseña actualizada correctamente para: {email}")
+        except Exception as e:
+            logger.error(f"❌ Error actualizando contraseña: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Error actualizando la contraseña. Intenta nuevamente."
+            )
+        
+        # 5. Invalidar el token para que no se pueda reutilizar
+        invalidate_token(reset_data.token)
+        logger.info(f"🗑️ Token invalidado")
         
         return {
             "success": True,
-            "message": "Contraseña actualizada correctamente"
+            "message": "Contraseña actualizada correctamente. Ya puedes iniciar sesión con tu nueva contraseña."
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"❌ Error al cambiar contraseña: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Error inesperado al cambiar contraseña: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Error inesperado. Por favor intenta nuevamente."
+        )
 
 @app.post("/api/auth/resend-verification")
 @limiter.limit("3/minute")
