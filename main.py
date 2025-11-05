@@ -55,8 +55,12 @@ from firebase_admin import credentials, auth
 # Cargar variables de entorno
 load_dotenv()
 
-cred = credentials.Certificate("./profego-firebase-adminsdk.json")
-firebase_admin.initialize_app(cred)
+firebase_creds_json = os.getenv("FIREBASE_ADMIN_CREDENTIALS_JSON")
+if firebase_creds_json:
+    cred = credentials.Certificate(json.loads(firebase_creds_json))
+    firebase_admin.initialize_app(cred)
+else:
+    logger.error("❌ FIREBASE_ADMIN_CREDENTIALS_JSON no configurada")
 
 app = FastAPI(title="ProfeGo API", version="2.0.0")
 rag_system = None
