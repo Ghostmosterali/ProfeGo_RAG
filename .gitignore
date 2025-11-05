@@ -13,7 +13,7 @@
 Google_Cloud_Key.json
 *-key.json
 credentials.json
-
+profego-firebase-adminsdk.json
 # Excepción: permitir package.json
 !package.json
 !package-lock.json
@@ -96,3 +96,7 @@ htmlcov/
 *.sqlite
 *.db
 node_modules/
+
+# Firebase
+*firebase-adminsdk*.json
+firebase-credentials.json

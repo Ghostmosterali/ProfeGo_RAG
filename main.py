@@ -36,12 +36,27 @@ from gcs_storage import GCSStorageManagerV2
 # Importar el servicio de Gemini AI
 from gemini_service import generar_plan_estudio
 
+from email_service import (
+    email_service,
+    send_verification_email,
+    send_password_reset_email,
+    send_login_notification,
+    verify_token,
+    invalidate_token
+)
+from user_agents import parse as parse_user_agent
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+import firebase_admin
+from firebase_admin import credentials, auth
+
 # Cargar variables de entorno
 load_dotenv()
+
+cred = credentials.Certificate("./profego-firebase-adminsdk.json")
+firebase_admin.initialize_app(cred)
 
 app = FastAPI(title="ProfeGo API", version="2.0.0")
 rag_system = None
@@ -72,7 +87,7 @@ app.add_middleware(
 )
 
 # Configuración de archivos
-MAX_FILE_SIZE = 80 * 1024 * 1024  # 80MB
+MAX_FILE_SIZE = 15 * 1024 * 1024  # 15MB
 ALLOWED_EXTENSIONS = {
     '.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', 
     '.png', '.xlsx', '.xls', '.csv', '.json', '.xml'
@@ -151,6 +166,13 @@ class PlanResponse(BaseModel):
     plan_data: Optional[Dict] = None
     error: Optional[str] = None
     processing_time: Optional[float] = None
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+class PasswordReset(BaseModel):
+    token: str
+    new_password: str
 
 # ---------------- Utilidades ----------------
 class ProfeGoUtils:
@@ -273,7 +295,7 @@ async def startup_event():
 @app.post("/api/auth/login", response_model=UserResponse)
 @limiter.limit("10/minute")
 async def login(request: Request, user_data: UserLogin):
-    """Iniciar sesión con rate limiting"""
+    """Iniciar sesión con notificación de email"""
     logger.info(f"📧 Intento de login: {user_data.email}")
     
     if not ProfeGoUtils.validar_email(user_data.email):
@@ -283,9 +305,38 @@ async def login(request: Request, user_data: UserLogin):
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
     
     try:
+        # Login en Firebase
         user = auth.sign_in_with_email_and_password(user_data.email, user_data.password)
         gcs_storage.inicializar_usuario(user_data.email)
         logger.info(f"✅ Login exitoso: {user_data.email}")
+        
+        # ⭐ NUEVO: Enviar notificación de inicio de sesión
+        try:
+            # Obtener información del dispositivo/navegador
+            user_agent_string = request.headers.get('user-agent', '')
+            client_ip = request.client.host if request.client else None
+            
+            # Parsear user agent
+            try:
+                from user_agents import parse
+                ua = parse(user_agent_string)
+                device_info = f"{ua.browser.family} {ua.browser.version_string} en {ua.os.family} {ua.os.version_string}"
+            except:
+                device_info = "Navegador desconocido"
+            
+            # Enviar notificación (en segundo plano, no bloquea el login)
+            email_result = send_login_notification(
+                email=user_data.email,
+                device_info=device_info,
+                ip_address=client_ip,
+                location="Guadalajara, Jalisco, MX"  # Puedes usar una API de geolocalización
+            )
+            
+            if email_result['success']:
+                logger.info(f"🔔 Notificación de login enviada a {user_data.email}")
+        except Exception as e:
+            logger.warning(f"⚠️ No se pudo enviar notificación de login: {e}")
+            # No falla el login si falla el email
         
         return UserResponse(
             email=user_data.email,
@@ -308,7 +359,7 @@ async def login(request: Request, user_data: UserLogin):
 @app.post("/api/auth/register")
 @limiter.limit("3/minute")
 async def register(request: Request, user_data: UserLogin):
-    """Registrar nuevo usuario con rate limiting"""
+    """Registrar nuevo usuario con verificación de email"""
     logger.info(f"📝 Intento de registro: {user_data.email}")
     
     if not ProfeGoUtils.validar_email(user_data.email):
@@ -318,11 +369,36 @@ async def register(request: Request, user_data: UserLogin):
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres")
     
     try:
+        # Registrar en Firebase
         auth.create_user_with_email_and_password(user_data.email, user_data.password)
-        gcs_storage.inicializar_usuario(user_data.email)
-        logger.info(f"✅ Registro exitoso: {user_data.email}")
         
-        return {"message": "Usuario registrado correctamente. Ya puedes iniciar sesión."}
+        # Inicializar estructura en GCS
+        gcs_storage.inicializar_usuario(user_data.email)
+        
+        logger.info(f"✅ Usuario registrado: {user_data.email}")
+        
+        # ⭐ NUEVO: Enviar email de verificación
+        try:
+            email_result = send_verification_email(user_data.email)
+            if email_result['success']:
+                logger.info(f"📧 Email de verificación enviado a {user_data.email}")
+                return {
+                    "message": "Usuario registrado correctamente. Por favor verifica tu correo electrónico para activar tu cuenta.",
+                    "email_sent": True
+                }
+            else:
+                logger.warning(f"⚠️ No se pudo enviar email de verificación: {email_result.get('error')}")
+                return {
+                    "message": "Usuario registrado correctamente, pero no se pudo enviar el email de verificación. Ya puedes iniciar sesión.",
+                    "email_sent": False
+                }
+        except Exception as e:
+            logger.error(f"❌ Error enviando email de verificación: {e}")
+            return {
+                "message": "Usuario registrado correctamente, pero hubo un problema con el email. Ya puedes iniciar sesión.",
+                "email_sent": False
+            }
+        
     except Exception as e:
         error_msg = str(e)
         logger.error(f"❌ Error en registro: {error_msg}")
@@ -332,6 +408,149 @@ async def register(request: Request, user_data: UserLogin):
         else:
             raise HTTPException(status_code=400, detail="Error en el registro")
 
+
+@app.get("/api/auth/verify-email")
+async def verify_email(token: str):
+    """
+    Verifica el email del usuario mediante token
+    Esta ruta se llama cuando el usuario hace clic en el enlace del email
+    """
+    logger.info(f"📧 Verificando email con token: {token[:10]}...")
+    
+    try:
+        # Verificar token
+        email = verify_token(token, 'verification')
+        
+        if not email:
+            raise HTTPException(
+                status_code=400,
+                detail="Token inválido o expirado. Por favor solicita un nuevo enlace de verificación."
+            )
+        
+        # Invalidar token después de usarlo
+        invalidate_token(token)
+        
+        logger.info(f"✅ Email verificado: {email}")
+        
+        # Redirigir al login con mensaje de éxito
+        return FileResponse(
+            "/home/claude/verification-success.html",
+            media_type="text/html"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error verificando email: {e}")
+        raise HTTPException(status_code=500, detail="Error verificando email")
+
+@app.post("/api/auth/request-password-reset")
+@limiter.limit("3/minute")
+async def request_password_reset(request: Request, reset_request: PasswordResetRequest):
+    """
+    Solicita restablecimiento de contraseña
+    Envía email con enlace para crear nueva contraseña
+    """
+    logger.info(f"🔑 Solicitud de reset de contraseña para: {reset_request.email}")
+    
+    try:
+        # Verificar que el email existe en Firebase
+        # Nota: Firebase no tiene una API directa para verificar si un email existe
+        # sin intentar un login, así que enviamos el email sin verificar
+        
+        # Enviar email de restablecimiento
+        email_result = send_password_reset_email(reset_request.email)
+        
+        if not email_result['success']:
+            raise HTTPException(
+                status_code=500,
+                detail="Error enviando el correo de restablecimiento"
+            )
+        
+        logger.info(f"✅ Email de reset enviado a {reset_request.email}")
+        
+        # Por seguridad, siempre devolvemos el mismo mensaje
+        # incluso si el email no existe (previene enumeración de usuarios)
+        return {
+            "message": "Si el correo existe en nuestro sistema, recibirás un enlace para restablecer tu contraseña.",
+            "email_sent": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error en solicitud de reset: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error procesando la solicitud"
+        )
+
+@app.post("/api/auth/reset-password")
+@limiter.limit("5/minute")
+async def reset_password(request: Request, token: str, new_password: str):
+    try:
+        # Verificar el token
+        if token not in verification_tokens:
+            raise HTTPException(status_code=400, detail="Token inválido o expirado")
+        
+        email = verification_tokens[token]
+        
+        # Buscar el usuario por email
+        user = auth.get_user_by_email(email)
+        
+        # Cambiar la contraseña directamente con Admin SDK
+        auth.update_user(
+            user.uid,
+            password=new_password
+        )
+        
+        # Eliminar el token usado
+        del verification_tokens[token]
+        
+        logger.info(f"✅ Contraseña cambiada exitosamente para: {email}")
+        
+        return {
+            "success": True,
+            "message": "Contraseña actualizada correctamente"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error al cambiar contraseña: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth/resend-verification")
+@limiter.limit("3/minute")
+async def resend_verification(request: Request, user_data: UserLogin):
+    """
+    Reenvía el email de verificación
+    """
+    logger.info(f"📧 Reenviando verificación a: {user_data.email}")
+    
+    try:
+        # Enviar email de verificación
+        email_result = send_verification_email(user_data.email)
+        
+        if not email_result['success']:
+            raise HTTPException(
+                status_code=500,
+                detail="Error enviando el correo de verificación"
+            )
+        
+        logger.info(f"✅ Email de verificación reenviado a {user_data.email}")
+        
+        return {
+            "message": "Email de verificación enviado. Por favor revisa tu bandeja de entrada.",
+            "email_sent": True
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error reenviando verificación: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error enviando el correo"
+        )
 # ============================================================================
 # RUTAS DE ARCHIVOS
 # ============================================================================
@@ -362,7 +581,7 @@ async def upload_files(
             
             if len(content) > MAX_FILE_SIZE:
                 errores_procesamiento.append(
-                    f"{file.filename}: Archivo muy grande (máx: 80MB)"
+                    f"{file.filename}: Archivo muy grande (máx: 15MB)"
                 )
                 continue
             
@@ -651,7 +870,7 @@ async def generate_plan_with_rag(
         if len(plan_content) > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=400,
-                detail="El archivo del plan excede el límite de 80MB"
+                detail="El archivo del plan excede el límite de 15MB"
             )
         
         diagnostico_content = None
@@ -668,7 +887,7 @@ async def generate_plan_with_rag(
             if len(diagnostico_content) > MAX_FILE_SIZE:
                 raise HTTPException(
                     status_code=400,
-                    detail="El archivo de diagnóstico excede el límite de 80MB"
+                    detail="El archivo de diagnóstico excede el límite de 15MB"
                 )
             diagnostico_filename = diagnostico_file.filename
         
@@ -2169,6 +2388,26 @@ async def serve_menu():
         return FileResponse(menu_path)
     else:
         raise HTTPException(status_code=404, detail="menu.html no encontrado")
+
+@app.get("/reset-password.html")
+async def serve_reset_password():
+    """Servir reset-password.html"""
+    reset_path = os.path.join(FRONTEND_DIR, "reset-password.html")
+    
+    if os.path.exists(reset_path):
+        return FileResponse(reset_path)
+    else:
+        raise HTTPException(status_code=404, detail="reset-password.html no encontrado")
+
+@app.get("/forgot-password.html")
+async def serve_forgot_password():
+    """Servir forgot-password.html"""
+    forgot_path = os.path.join(FRONTEND_DIR, "forgot-password.html")
+    
+    if os.path.exists(forgot_path):
+        return FileResponse(forgot_path)
+    else:
+        raise HTTPException(status_code=404, detail="forgot-password.html no encontrado")
 
 @app.get("/health")
 async def health_check():
