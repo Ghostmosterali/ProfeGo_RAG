@@ -26,7 +26,8 @@ from rag_system import get_rag_system, initialize_rag_system
 from typing import List, Dict, Optional
 import json
 from pathlib import Path
-
+import firebase_admin
+from firebase_admin import credentials, auth as admin_auth
 # Importar el módulo OCR
 from PruebaOcr import process_file_to_txt, check_supported_file, get_text_only
 
@@ -48,9 +49,6 @@ from user_agents import parse as parse_user_agent
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-import firebase_admin
-from firebase_admin import credentials, auth
 
 # Cargar variables de entorno
 load_dotenv()
@@ -518,8 +516,7 @@ async def reset_password(request: Request, reset_data: PasswordReset):
         
         # 3. Obtener el usuario por email usando Firebase Admin SDK
         try:
-            from firebase_admin import auth as admin_auth
-            user = admin_auth.get_user_by_email(email)
+            user = admin_auth.get_user_by_email(email)  # ⭐ Cambiado aquí
             logger.info(f"✅ Usuario encontrado: {user.uid}")
         except Exception as e:
             logger.error(f"❌ Usuario no encontrado: {e}")
@@ -530,7 +527,7 @@ async def reset_password(request: Request, reset_data: PasswordReset):
         
         # 4. Actualizar la contraseña usando Admin SDK
         try:
-            admin_auth.update_user(
+            admin_auth.update_user(  # ⭐ Cambiado aquí
                 user.uid,
                 password=reset_data.new_password
             )
