@@ -429,16 +429,45 @@ async def verify_email(token: str):
                 detail="Token inválido o expirado. Por favor solicita un nuevo enlace de verificación."
             )
         
+        # Marcar el email como verificado en Firebase Admin SDK
+        try:
+            # Buscar usuario por email
+            user = admin_auth.get_user_by_email(email)
+            
+            # Actualizar el estado de verificación
+            admin_auth.update_user(
+                user.uid,
+                email_verified=True
+            )
+            logger.info(f"✅ Email marcado como verificado en Firebase: {email}")
+        except Exception as firebase_error:
+            logger.error(f"❌ Error actualizando estado en Firebase: {firebase_error}")
+            # Continuar aunque falle la actualización en Firebase
+        
         # Invalidar token después de usarlo
         invalidate_token(token)
         
-        logger.info(f"✅ Email verificado: {email}")
+        logger.info(f"✅ Email verificado exitosamente: {email}")
         
-        # Redirigir al login con mensaje de éxito
-        return FileResponse(
-            "/home/claude/verification-success.html",
-            media_type="text/html"
-        )
+        # ⭐ CORRECCIÓN: Usar ruta dinámica del frontend
+        verification_success_path = os.path.join(FRONTEND_DIR, "verification-success.html")
+        
+        if os.path.exists(verification_success_path):
+            return FileResponse(
+                verification_success_path,
+                media_type="text/html"
+            )
+        else:
+            # Si no existe la página, devolver respuesta JSON como fallback
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "message": "✅ Email verificado exitosamente. Ya puedes iniciar sesión.",
+                    "email": email,
+                    "redirect": "/login.html"
+                },
+                status_code=200
+            )
         
     except HTTPException:
         raise
@@ -2447,6 +2476,16 @@ async def serve_forgot_password():
         return FileResponse(forgot_path)
     else:
         raise HTTPException(status_code=404, detail="forgot-password.html no encontrado")
+
+@app.get("/verification-success.html")
+async def serve_verification_success():
+    """Servir verification-success.html"""
+    success_path = os.path.join(FRONTEND_DIR, "verification-success.html")
+    
+    if os.path.exists(success_path):
+        return FileResponse(success_path)
+    else:
+        raise HTTPException(status_code=404, detail="verification-success.html no encontrado")
 
 @app.get("/health")
 async def health_check():
