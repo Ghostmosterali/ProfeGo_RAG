@@ -55,7 +55,7 @@ load_dotenv()
 
 firebase_creds_json = os.getenv("FIREBASE_ADMIN_CREDENTIALS_JSON")
 if firebase_creds_json:
-    cred = credentials.Certificate(firebase_creds_json)
+    cred = credentials.Certificate(json.loads(firebase_creds_json))
     firebase_admin.initialize_app(cred)
 else:
     logger.error("❌ FIREBASE_ADMIN_CREDENTIALS_JSON no configurada")
