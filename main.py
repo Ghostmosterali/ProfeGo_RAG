@@ -215,19 +215,41 @@ class ProfeGoUtils:
 
 # ---------------- Dependency para autenticación ----------------
 async def get_current_user(authorization: str = Header(None)):
-    """Verificar token de Firebase y extraer usuario"""
+    """Verificar token de Firebase y extraer usuario - REQUIERE EMAIL VERIFICADO"""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Token no proporcionado")
     
     token = authorization.replace("Bearer ", "")
     
     try:
-        user_info = auth.get_account_info(token)
-        email = user_info['users'][0]['email']
-        return {"email": email, "token": token}
+        # ⭐ USAR FIREBASE ADMIN SDK para obtener información completa del token
+        decoded_token = admin_auth.verify_id_token(token)
+        email = decoded_token.get('email')
+        email_verified = decoded_token.get('email_verified', False)
+        
+        # ⭐ VALIDACIÓN CRÍTICA: Verificar que el email esté verificado
+        if not email_verified:
+            logger.warning(f"⚠️ Usuario {email} intentó acceder sin verificar su correo")
+            raise HTTPException(
+                status_code=403, 
+                detail="Por favor verifica tu correo electrónico antes de acceder a la aplicación. Revisa tu bandeja de entrada."
+            )
+        
+        logger.info(f"✅ Usuario autenticado y verificado: {email}")
+        return {"email": email, "token": token, "email_verified": email_verified}
+        
+    except admin_auth.InvalidIdTokenError:
+        logger.error("Token de Firebase inválido")
+        raise HTTPException(status_code=401, detail="Token inválido")
+    except admin_auth.ExpiredIdTokenError:
+        logger.error("Token de Firebase expirado")
+        raise HTTPException(status_code=401, detail="Token expirado. Por favor inicia sesión nuevamente")
+    except HTTPException:
+        # Re-lanzar excepciones HTTP (como el 403 de email no verificado)
+        raise
     except Exception as e:
         logger.error(f"Error verificando token: {e}")
-        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+        raise HTTPException(status_code=401, detail="Error de autenticación")
 
 # ============================================================================
 # STARTUP EVENT - Inicialización del sistema RAG
@@ -309,16 +331,34 @@ async def login(request: Request, user_data: UserLogin):
     try:
         # Login en Firebase
         user = auth.sign_in_with_email_and_password(user_data.email, user_data.password)
+        token = user.get("idToken")
+        
+        # ⭐ NUEVO: Verificar estado del email inmediatamente en el login
+        try:
+            decoded_token = admin_auth.verify_id_token(token)
+            email_verified = decoded_token.get('email_verified', False)
+            
+            if not email_verified:
+                logger.warning(f"⚠️ Usuario {user_data.email} intentó iniciar sesión sin verificar email")
+                raise HTTPException(
+                    status_code=403,
+                    detail="Por favor verifica tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada."
+                )
+        except HTTPException:
+            raise
+        except Exception as verify_error:
+            logger.error(f"Error verificando estado del email: {verify_error}")
+            # Continuar con el login si hay error verificando (por compatibilidad)
+        
+        # Inicializar usuario en GCS
         gcs_storage.inicializar_usuario(user_data.email)
         logger.info(f"✅ Login exitoso: {user_data.email}")
         
-        # ⭐ NUEVO: Enviar notificación de inicio de sesión
+        # Enviar notificación de inicio de sesión
         try:
-            # Obtener información del dispositivo/navegador
             user_agent_string = request.headers.get('user-agent', '')
             client_ip = request.client.host if request.client else None
             
-            # Parsear user agent
             try:
                 from user_agents import parse
                 ua = parse(user_agent_string)
@@ -326,23 +366,21 @@ async def login(request: Request, user_data: UserLogin):
             except:
                 device_info = "Navegador desconocido"
             
-            # Enviar notificación (en segundo plano, no bloquea el login)
             email_result = send_login_notification(
                 email=user_data.email,
                 device_info=device_info,
                 ip_address=client_ip,
-                location="Guadalajara, Jalisco, MX"  # Puedes usar una API de geolocalización
+                location="Guadalajara, Jalisco, MX"
             )
             
             if email_result['success']:
                 logger.info(f"🔔 Notificación de login enviada a {user_data.email}")
         except Exception as e:
             logger.warning(f"⚠️ No se pudo enviar notificación de login: {e}")
-            # No falla el login si falla el email
         
         return UserResponse(
             email=user_data.email,
-            token=user.get("idToken"),
+            token=token,
             message=f"Bienvenido/a {user_data.email}"
         )
     except Exception as e:
