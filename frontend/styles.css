@@ -63,6 +63,18 @@ body {
     color: var(--text-light);
 }
 
+.btn-disabled {
+    background-color: #cccccc !important;
+    color: #888888 !important;
+    cursor: not-allowed !important;
+    opacity: 0.6;
+}
+
+.btn-disabled:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 .btn-danger {
     background-color: #f88363;
     color: var(--text-light);
@@ -144,6 +156,89 @@ body {
 
 .input-group input:focus {
     outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+/* ===== NUEVO: ESTILOS PARA CHECKBOX DE TÉRMINOS ===== */
+.terms-checkbox-container {
+    margin: 15px 0;
+    text-align: left;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-dark);
+    position: relative;
+    padding: 8px 0;
+}
+
+.terms-checkbox {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkmark {
+    position: relative;
+    top: 2px;
+    height: 18px;
+    width: 18px;
+    background-color: #fff;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    transition: var(--transition);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.checkmark:after {
+    content: "";
+    display: none;
+    width: 6px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.terms-checkbox:checked ~ .checkmark {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.terms-checkbox:checked ~ .checkmark:after {
+    display: block;
+}
+
+.checkbox-text {
+    flex: 1;
+    user-select: none;
+}
+
+.checkbox-text .terms-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.checkbox-text .terms-link:hover {
+    color: #45a049;
+    text-decoration: underline;
+}
+
+/* Efecto hover para el checkbox */
+.checkbox-label:hover .checkmark {
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
 }
@@ -926,6 +1021,23 @@ body {
     .preview-modal-content {
         padding: 10px;
     }
+
+    /* NUEVO: Responsive para checkbox */
+    .checkbox-label {
+        font-size: 13px;
+        gap: 10px;
+    }
+    
+    .checkmark {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .checkmark:after {
+        width: 5px;
+        height: 8px;
+    }
+    
 }
 
 @media (max-width: 480px) {
@@ -960,6 +1072,29 @@ body {
         width: 100%;
         justify-content: space-between;
     }
+
+    /* NUEVO: Responsive mobile para checkbox */
+    .terms-checkbox-container {
+        margin: 12px 0;
+    }
+    
+    .checkbox-label {
+        font-size: 12px;
+        gap: 8px;
+        padding: 6px 0;
+    }
+    
+    .checkmark {
+        width: 15px;
+        height: 15px;
+    }
+    
+    .checkmark:after {
+        width: 4px;
+        height: 7px;
+        border-width: 0 1.5px 1.5px 0;
+    }
+    
 }
 
 /* ===== NUEVOS ESTILOS PARA GENERACIÓN DE PLANES ===== */
