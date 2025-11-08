@@ -3,6 +3,7 @@ const emailInput = document.getElementById('email');
 const passwordInput = document.getElementById('password');
 const loginBtn = document.getElementById('login-btn');
 const registerBtn = document.getElementById('register-btn');
+const acceptTermsCheckbox = document.getElementById('accept-terms');
 
 // Elementos de validación visual
 const passwordRequirements = document.getElementById('password-requirements');
@@ -23,6 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Configurar event listeners
     setupEventListeners();
     setupPasswordValidation();
+    setupTermsCheckbox();
 });
 
 // ===== VALIDACIÓN VISUAL EN TIEMPO REAL =====
@@ -56,6 +58,48 @@ function setupPasswordValidation() {
         // Validar carácter especial
         updateRequirement(reqSpecial, /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password));
     });
+}
+
+// ===== NUEVA FUNCIÓN: CONFIGURAR CHECKBOX DE TÉRMINOS =====
+function setupTermsCheckbox() {
+    // Inicialmente el botón registrar está deshabilitado
+    updateRegisterButton();
+    
+    // Event listener para el checkbox
+    acceptTermsCheckbox.addEventListener('change', function() {
+        updateRegisterButton();
+    });
+    
+    // Event listeners adicionales para los enlaces de términos en el checkbox
+    const openTermsRegister = document.getElementById('open-terms-register');
+    const openPrivacyRegister = document.getElementById('open-privacy-register');
+    
+    if (openTermsRegister) {
+        openTermsRegister.addEventListener('click', (e) => {
+            e.preventDefault();
+            openModal(termsModal);
+        });
+    }
+    
+    if (openPrivacyRegister) {
+        openPrivacyRegister.addEventListener('click', (e) => {
+            e.preventDefault();
+            openModal(privacyModal);
+        });
+    }
+}
+
+// ===== FUNCIÓN PARA ACTUALIZAR ESTADO DEL BOTÓN REGISTRAR =====
+function updateRegisterButton() {
+    const isChecked = acceptTermsCheckbox.checked;
+    
+    if (isChecked) {
+        registerBtn.disabled = false;
+        registerBtn.classList.remove('btn-disabled');
+    } else {
+        registerBtn.disabled = true;
+        registerBtn.classList.add('btn-disabled');
+    }
 }
 
 function updateRequirement(element, isValid) {
@@ -168,6 +212,13 @@ function setupEventListeners() {
     
     registerBtn.addEventListener('click', function(e) {
         e.preventDefault();
+        
+        // Verificar si el checkbox está marcado
+        if (!acceptTermsCheckbox.checked) {
+            showMessage('Debes aceptar los Términos y Condiciones y la Política de Privacidad para registrarte', 'error');
+            return;
+        }
+        
         const email = emailInput.value.trim();
         const password = passwordInput.value;
         
